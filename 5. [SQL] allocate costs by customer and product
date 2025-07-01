@@ -1,0 +1,886 @@
+	--view: thc.da_thc_profit_phanbochiphi_v1
+	
+CREATE OR REPLACE VIEW thc.da_thc_profit_phanbochiphi_v1 AS(
+
+	--PHẦN LẤY TỪ GL
+	---0. Full GL
+	WITH gl AS (
+		SELECT 
+			DATE_TRUNC('month', gl.gl_date)::DATE AS ky_stc,
+			SUM(gl.accounted_dr - gl.accounted_cr) AS net_value,
+			CONCAT(gl.account, '.', gl.subaccount) AS acc_sub,
+			LEFT(gl.account, 3) AS acc,
+			gl.subaccount
+		FROM public.da_gl001 gl
+		WHERE DATE_TRUNC('month', gl.gl_date) >= '2024-01-01'   --old:gl.gl_date >= '2024-03-01' 
+			AND gl.company = '110'  
+			AND LEFT(gl.account, 1) IN ('5', '6', '7', '8')
+			--mới thêm 1 dòng bên dưới
+			AND NOT (gl.account = '641702' AND gl.subaccount IN ('0202', '0203', '0204', '0205'))
+		GROUP BY
+			DATE_TRUNC('month', gl.gl_date)::DATE,
+			CONCAT(gl.account, '.', gl.subaccount),
+			LEFT(gl.account, 3),
+			gl.subaccount
+	), 
+    ----0. DOANH THU
+
+	dt as (
+
+	select 
+		business_unit as bu,
+		DATE_TRUNC('month',c_ky_sqt)::date AS ky_sqt,
+		q.ten_kho_bao_cao as c_kho,
+		customer_name as khach_hang,
+		CASE 
+			WHEN item_code  IS NULL THEN 'Fill'
+		ELSE item_code
+		END as san_pham,
+		----
+		CASE 
+			WHEN item_code IS NOT NULL THEN item_code
+			WHEN item_code IS NULL AND line_description ='THAN ĐÁ THÀNH PHẨM NHIỆT LƯỢNG GAR3201-3499' THEN '100010047'--'[100010047] Than Thành Phẩm (GAR 3201-3499)'
+			WHEN item_code IS NULL AND line_description ='THAN ĐÁ THÀNH PHẨM NHIỆT LƯỢNG GAR4601-4800' THEN '100010014'--'[100010014] Than Thành Phẩm (GAR 4601-4800)'
+			WHEN item_code IS NULL AND line_description ='THAN ĐÁ THÀNH PHẨM NHIỆT LƯỢNG GAR3500-3700' THEN '100010001'--'[100010001] Than Thành Phẩm (GAR 3500-3700)'
+			WHEN item_code IS NULL AND line_description ='THAN ĐÁ THÀNH PHẨM NHIỆT LƯỢNG GAR3701-4100' THEN '100010002'--'[100010002] Than Thành Phẩm (GAR 3701-4100)'
+			WHEN item_code IS NULL AND line_description ='THAN ĐÁ THÀNH PHẨM NHIỆT LƯỢNG GAR4101-4300' THEN '100010003'--'[100010003] Than Thành Phẩm (GAR 4101-4300)'
+		ELSE ten_sp
+		END as than_tp,
+		----
+		CASE 
+			WHEN ten_sp='DV cho thuê xe' THEN 'DV thuê xe'
+			WHEN ten_sp='Trấu viên' THEN 'Biomass'
+			WHEN ten_sp='Than đá' THEN 'Than đá'
+			WHEN ten_sp='Dầu nhớt' THEN 'Dầu nhớt'
+		ELSE ten_sp
+		END as nhom_sp_lv1,
+		CASE 
+			WHEN ten_sp='DV cho thuê xe' THEN 'DV thuê xe'
+			WHEN ten_sp='Trấu viên' THEN 'Biomass'
+			WHEN ten_sp='Than đá' THEN 'Than đá'
+			WHEN ten_sp='Dầu nhớt' THEN 'Dầu nhớt'
+		ELSE ten_sp
+		END as nhom_sp_lv2,
+		sum(c_net_value_qd) as doanh_thu,
+		
+		--Rule phân bổ dầu
+			sum(CASE WHEN ten_sp='Dầu nhớt'  THEN c_net_value_qd
+						ELSE 0
+					END) / NULLIF(sum(sum(
+					CASE
+						WHEN ten_sp='Dầu nhớt' THEN c_net_value_qd
+						ELSE 0
+					END)) OVER (PARTITION BY (date_part('year', c_ky_sqt)), c_ky_sqt), 0) AS dt_tl_dau,
+		--Rule phân bổ DV thuê xe
+			sum(CASE WHEN ten_sp='DV cho thuê xe'  THEN c_net_value_qd
+						ELSE 0
+					END) / NULLIF(sum(sum(
+					CASE
+						WHEN ten_sp='DV cho thuê xe' THEN c_net_value_qd
+						ELSE 0
+					END)) OVER (PARTITION BY (date_part('year', c_ky_sqt)), c_ky_sqt), 0) AS dt_tl_xe,
+		--Rule phân bổ than đá+biomass
+			sum(CASE WHEN ten_sp IN ('Than đá','Trấu viên') THEN c_net_value_qd
+						ELSE 0
+					END) / NULLIF(sum(sum(
+					CASE
+						WHEN ten_sp IN ('Than đá','Trấu viên') THEN c_net_value_qd
+						ELSE 0
+					END)) OVER (PARTITION BY (date_part('year', c_ky_sqt)), c_ky_sqt), 0) AS dt_tl_than_trau,
+		---Rule mới, phân bổ DT dầu theo kho  
+		sum(CASE WHEN ten_sp='Dầu nhớt' THEN c_net_value_qd 
+			ELSE 0 END) / NULLIF(sum(sum(
+					CASE WHEN ten_sp='Dầu nhớt' THEN c_net_value_qd
+						ELSE 0
+					END)) OVER (PARTITION BY (date_part('year', c_ky_sqt)), c_ky_sqt, q.ten_kho_bao_cao), 0) AS dt_tl_dau_theo_kho
+	from thc.da_thc_oracle_doanhthu_v1
+	--TH mới thêm
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkho_n1 q ON warehouse_name = q.ten_kho_source
+	where extract(year from c_ky_sqt) =2024
+	group by 
+		(date_part('year', c_ky_sqt)),
+		c_ky_sqt,
+		business_unit,
+		DATE_TRUNC('month',c_ky_sqt),
+		customer_name,
+		CASE 
+			WHEN item_code  IS NULL THEN 'Fill'
+		ELSE item_code
+		END,
+		----
+		CASE 
+			WHEN item_code IS NOT NULL THEN item_code
+			WHEN item_code IS NULL AND line_description ='THAN ĐÁ THÀNH PHẨM NHIỆT LƯỢNG GAR3201-3499' THEN '100010047'--'[100010047] Than Thành Phẩm (GAR 3201-3499)'
+			WHEN item_code IS NULL AND line_description ='THAN ĐÁ THÀNH PHẨM NHIỆT LƯỢNG GAR4601-4800' THEN '100010014'--'[100010014] Than Thành Phẩm (GAR 4601-4800)'
+			WHEN item_code IS NULL AND line_description ='THAN ĐÁ THÀNH PHẨM NHIỆT LƯỢNG GAR3500-3700' THEN '100010001'--'[100010001] Than Thành Phẩm (GAR 3500-3700)'
+			WHEN item_code IS NULL AND line_description ='THAN ĐÁ THÀNH PHẨM NHIỆT LƯỢNG GAR3701-4100' THEN '100010002'--'[100010002] Than Thành Phẩm (GAR 3701-4100)'
+			WHEN item_code IS NULL AND line_description ='THAN ĐÁ THÀNH PHẨM NHIỆT LƯỢNG GAR4101-4300' THEN '100010003'--'[100010003] Than Thành Phẩm (GAR 4101-4300)'
+		ELSE ten_sp
+		END,
+		----
+		CASE 
+			WHEN ten_sp='DV cho thuê xe' THEN 'DV thuê xe'
+			WHEN ten_sp='Trấu viên' THEN 'Biomass'
+			WHEN ten_sp='Than đá' THEN 'Than đá'
+			WHEN ten_sp='Dầu nhớt' THEN 'Dầu nhớt'
+		ELSE ten_sp
+		END,
+		CASE 
+			WHEN ten_sp='DV cho thuê xe' THEN 'DV thuê xe'
+			WHEN ten_sp='Trấu viên' THEN 'Biomass'
+			WHEN ten_sp='Than đá' THEN 'Than đá'
+			WHEN ten_sp='Dầu nhớt' THEN 'Dầu nhớt'
+		ELSE ten_sp
+		END,
+		q.ten_kho_bao_cao
+	),
+	
+	
+	-----1. Rule phân bổ
+	quantity_totals AS (
+		SELECT 
+			p.bu,
+			DATE_TRUNC('month',p.c_transactions_period) AS ky_stc,
+			p.khach_hang,
+			p.san_pham,
+			CASE
+				WHEN p.san_pham = '[200030002]TRẤU VIÊN HÀNG XÁ' THEN '[200030002]TRẤU VIÊN HÀNG XÁ'
+				ELSE p.than_tp
+			END AS than_tp,
+			CASE 
+				WHEN LOWER(p.san_pham) ~ 'than' THEN 'Than đá'
+				WHEN LOWER(p.san_pham) ~ 'trấu|viên' THEN 'Biomass'
+				WHEN LOWER(p.san_pham) ~ 'thuê xe' THEN 'DV thuê xe'
+				ELSE 'Khác' 
+			END AS nhom_sp_lv1,
+			CASE 
+				WHEN 
+					(CASE WHEN LOWER(p.san_pham) ~ 'than' THEN 'Than đá'
+						  WHEN LOWER(p.san_pham) ~ 'trấu|viên' THEN 'Biomass'
+						  WHEN LOWER(p.san_pham) ~ 'thuê xe' THEN 'DV thuê xe'
+						  ELSE 'Khác' 
+					END) = 'DV cho thuê xe' THEN 'DV thuê xe'
+				ELSE 
+					CASE WHEN LOWER(p.san_pham) ~ 'than' THEN 'Than đá'
+						 WHEN LOWER(p.san_pham) ~ 'trấu|viên' THEN 'Biomass'
+						 WHEN LOWER(p.san_pham) ~ 'thuê xe' THEN 'DV thuê xe'
+						 ELSE 'Khác' 
+					END
+			END AS nhom_sp_lv2,
+			q.ten_kho_bao_cao AS c_kho,
+			SUM(p.khoi_luong_1) * -1 AS c_quantity,
+			sum(p.gia_tri) AS c_cpnl,
+			--NOTE QUAN TRỌNG: PHẢI PHÂN BỔ THEO NĂM NỮA, VÌ CÓ NHIỀU NĂM 2023,2024,2025
+			SUM(p.khoi_luong_1) / 
+				SUM(SUM(p.khoi_luong_1)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)), p.c_transactions_period) AS c_ty_le_theo_ky_stc, --Bỏ p.bu ra    /---old AQ:SUM(SUM(p.khoi_luong_1)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)), p.bu, p.c_transactions_period) AS c_ty_le_theo_ky_stc,
+
+			CASE WHEN SUM(SUM(p.khoi_luong_1)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)),p.c_transactions_period, p.bu, p.khach_hang, q.ten_kho_bao_cao) = 0 THEN 1
+				 ELSE SUM(p.khoi_luong_1) / 
+					  SUM(SUM(p.khoi_luong_1)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)),p.c_transactions_period, p.bu, p.khach_hang, q.ten_kho_bao_cao) 
+			END AS ty_le_kh_ct,
+			--Khúc này bổ sung thêm cho đầy đủ
+			
+			sum(CASE WHEN lower(p.san_pham) ~~ '%than nl%' THEN p.khoi_luong_1 
+			ELSE 0 END) / NULLIF(sum(sum(
+					CASE WHEN lower(p.san_pham) ~~ '%than nl%' THEN p.khoi_luong_1
+						ELSE 0
+					END)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)),p.c_transactions_period, q.ten_kho_bao_cao), 0) AS c_ty_le_theo_kho,
+			---theo than thôi cả thc và thcorp
+			sum(CASE WHEN lower(p.san_pham) ~~ '%than nl%' THEN p.khoi_luong_1
+						ELSE 0
+					END) / NULLIF(sum(sum(
+					CASE
+						WHEN lower(p.san_pham) ~~ '%than nl%' THEN p.khoi_luong_1
+						ELSE 0
+					END)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)), p.c_transactions_period), 0) AS c_ty_le_theo_ky_stc_only_than,  --bỏ p.bu ra
+			
+			--chỉ than thc thôi
+			sum(CASE WHEN lower(p.san_pham) ~~ '%than nl%' and bu ='THUANHAI_THC' THEN p.khoi_luong_1
+						ELSE 0
+					END) / NULLIF(sum(sum(
+					CASE
+						WHEN lower(p.san_pham) ~~ '%than nl%' and bu ='THUANHAI_THC' THEN p.khoi_luong_1
+						ELSE 0
+					END)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)), p.bu, p.c_transactions_period), 0) AS c_ty_le_theo_ky_stc_only_than_thc,
+			--CQ đang phân bổ cả năm, TH cũng nghĩ vậy vì KH này có trong SL, nhưng không khớp kỳ
+			--old: phân bổ theo kỳ: 
+	      --CASE WHEN SUM(SUM(p.khoi_luong_1)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)),p.c_transactions_period, p.khach_hang) = 0 THEN 1
+			CASE WHEN SUM(SUM(p.khoi_luong_1)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)), p.khach_hang) = 0 THEN 1
+				 ELSE SUM(p.khoi_luong_1) / 
+					  SUM(SUM(p.khoi_luong_1)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)), p.khach_hang) 
+			END AS c_ty_le_theo_khach_hang,
+			
+			--theo month cho CP logs
+			CASE WHEN SUM(SUM(p.khoi_luong_1)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)),p.c_transactions_period, p.khach_hang) = 0 THEN 1
+				 ELSE SUM(p.khoi_luong_1) / 
+					  SUM(SUM(p.khoi_luong_1)) OVER (PARTITION BY (date_part('year', p.c_transactions_period)),p.c_transactions_period, p.khach_hang) 
+			END AS c_ty_le_theo_khach_hang_month
+			
+		FROM subpublic.da_user02_combined_odoo_invtrans_mv5 p
+		JOIN subpublic.da_user02_profit_dim_dmkho_n1 q ON p.kho = q.ten_kho_source
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh1 ON REPLACE(REPLACE(kh1.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(p.khach_hang, '\n', ''), '\r', '')
+		WHERE p.loai_giao_dich = ANY (ARRAY['Xuất kho', 'Nhập trả hàng', 'Nhập chuyển giao']) 
+		  AND kh1.phan_loai <> 'Kho'
+		  --mới thêm vào do ảnh hưởng tới CPHH, PB cho KH theo cả 1 năm
+		  AND DATE_TRUNC('month',p.c_transactions_period)<>'2024-10-01'
+		GROUP BY (date_part('year', p.c_transactions_period)), p.c_transactions_period, p.khach_hang, p.san_pham,
+			CASE
+				WHEN p.san_pham = '[200030002]TRẤU VIÊN HÀNG XÁ' THEN '[200030002]TRẤU VIÊN HÀNG XÁ'
+				ELSE p.than_tp
+			END,
+			q.ten_kho_bao_cao, p.bu
+	), 
+	----2. GL * Rule phân bổ
+
+	---XỬ LÝ NEW
+	xuly AS (
+		SELECT qt.bu,
+			qt.ky_stc::date,
+			qt.c_kho,
+			qt.khach_hang,
+			qt.san_pham,
+			qt.than_tp,
+			qt.nhom_sp_lv1,
+			qt.nhom_sp_lv2,
+			gl.net_value as chi_phi,
+			qt.c_quantity AS so_luong,
+			0 AS doanh_thu,
+			CASE	
+				WHEN kmdc_coa.rule_pb = 'sl_than_trau' then qt.c_ty_le_theo_ky_stc
+				WHEN kmdc_coa.rule_pb = 'sl_than' then qt.c_ty_le_theo_ky_stc_only_than
+				WHEN kmdc_coa.rule_pb = 'sl_than_thc' then  qt.c_ty_le_theo_ky_stc_only_than_thc
+				ELSE qt.c_ty_le_theo_ky_stc
+			END AS ty_le_soluong,
+			
+			--old: qt.c_ty_le_theo_ky_stc AS ty_le_soluong,
+			0 AS ty_le_doanhthu,
+			CASE 
+				WHEN kmdc_coa.ten_kmcp_lv1 IS NOT NULL AND kmdc_coa.loai_cp ='CP PB theo SL' THEN kmdc_coa.ten_kmcp_lv1
+					WHEN gl.acc IN ('515') THEN kmdc_coa.acc_name_lv1--'CP tài chính'
+					--WHEN LEFT(t1.account, 3) IN ('632') THEN 'CP giá vốn'
+					WHEN gl.acc IN ('635') THEN kmdc_coa.acc_name_lv1 --'CP tài chính'
+					WHEN gl.acc IN ('641', '642') THEN  kmdc_coa.acc_name_lv1--'CP bán hàng, quản lý'
+					WHEN gl.acc IN ('711', '811') THEN  kmdc_coa.acc_name_lv1--THEN 'CP khác'
+					ELSE gl.acc
+				END AS ten_kmcp_lv1,
+			CASE 
+				WHEN kmdc_coa.ten_kmcp_lv2 IS NOT NULL AND kmdc_coa.loai_cp ='CP PB theo SL' THEN kmdc_coa.ten_kmcp_lv2
+					WHEN gl.acc IN ('515') THEN kmdc_coa.acc_name_lv2 --'CP tài chính'
+					--WHEN LEFT(t1.account, 3) IN ('632') THEN 'CP giá vốn'
+					WHEN gl.acc IN ('635') THEN kmdc_coa.acc_name_lv2--'CP tài chính'
+					WHEN gl.acc IN ('642') THEN kmdc_coa.acc_name_lv2--'CP quản lý'
+					WHEN gl.acc IN ('641') THEN kmdc_coa.acc_name_lv2 --'CP bán hàng'
+					WHEN gl.acc IN ('711', '811') THEN kmdc_coa.acc_name_lv2 --'CP khác'
+					ELSE gl.acc
+				END AS ten_kmcp_lv2,
+			CASE 
+				WHEN kmdc_coa.ten_kmcp_lv3 IS NOT NULL AND kmdc_coa.loai_cp ='CP PB theo SL' THEN kmdc_coa.ten_kmcp_lv3
+					WHEN gl.acc IN ('515') THEN kmdc_coa.acc_name_lv3 --'CP tài chính'
+					--WHEN LEFT(t1.account, 3) IN ('632') THEN 'CP giá vốn'
+					WHEN gl.acc IN ('635') THEN kmdc_coa.acc_name_lv3 --'CP tài chính'
+					WHEN gl.acc IN ('642') THEN kmdc_coa.acc_name_lv3 --'CP quản lý'
+					WHEN gl.acc IN ('641') THEN kmdc_coa.acc_name_lv3 --'CP bán hàng'
+					WHEN gl.acc IN ('711', '811') THEN kmdc_coa.acc_name_lv3-- 'CP khác'
+					ELSE gl.acc
+				END AS ten_kmcp_lv3,
+			CASE 
+				WHEN kmdc_coa.ten_kmcp_lv4 IS NOT NULL AND kmdc_coa.loai_cp ='CP PB theo SL' THEN kmdc_coa.ten_kmcp_lv4
+					WHEN gl.acc IN ('515') THEN kmdc_coa.subacc_name_lv1 --'CP tài chính'
+					--WHEN LEFT(t1.account, 3) IN ('632') THEN 'CP giá vốn'
+					WHEN gl.acc IN ('635') THEN kmdc_coa.subacc_name_lv1  --'CP tài chính'
+					WHEN gl.acc IN ('642') THEN kmdc_coa.subacc_name_lv1 --'CP quản lý'
+					WHEN gl.acc IN ('641') THEN kmdc_coa.subacc_name_lv1 --'CP bán hàng'
+					WHEN gl.acc IN ('711', '811') THEN kmdc_coa.subacc_name_lv1 -- 'CP khác'
+					ELSE gl.acc
+				END AS ten_kmcp_lv4,
+			CASE 
+				WHEN kmdc_coa.ten_kmcp_lv5 IS NOT NULL AND kmdc_coa.loai_cp ='CP PB theo SL' THEN kmdc_coa.subacc_name_lv2
+					WHEN gl.acc IN ('515') THEN kmdc_coa.subacc_name_lv2--'CP tài chính'
+					--WHEN LEFT(t1.account, 3) IN ('632') THEN 'CP giá vốn'
+					WHEN gl.acc IN ('635') THEN kmdc_coa.subacc_name_lv2 --'CP tài chính'
+					WHEN gl.acc IN ('642') THEN kmdc_coa.subacc_name_lv2 --'CP quản lý'
+					WHEN gl.acc IN ('641') THEN kmdc_coa.subacc_name_lv2--'CP bán hàng'
+					WHEN gl.acc IN ('711', '811') THEN kmdc_coa.subacc_name_lv2--'CP khác'
+					ELSE gl.acc
+				END AS ten_kmcp_lv5,
+		CASE 
+			WHEN kmdc_coa.loai_cp IS NOT NULL THEN kmdc_coa.loai_cp 
+		     ELSE 'CP PB theo SL'
+		END as loai_cp,
+		CASE	
+			WHEN kmdc_coa.rule_pb = 'sl_than_trau' then (gl.net_value * qt.c_ty_le_theo_ky_stc)
+			WHEN kmdc_coa.rule_pb = 'sl_than' then (gl.net_value * qt.c_ty_le_theo_ky_stc_only_than)
+			WHEN kmdc_coa.rule_pb = 'sl_than_thc' then (gl.net_value * qt.c_ty_le_theo_ky_stc_only_than_thc)
+		ELSE (gl.net_value * qt.c_ty_le_theo_ky_stc)
+		END AS net_value,
+			--old: (gl.net_value * qt.c_ty_le_theo_ky_stc) AS net_value,
+		kmdc_coa.rule_pb as note,
+		gl.acc,
+		gl.subaccount as sub,
+		gl.acc_sub,
+		kmdc_coa.acc_name_lv1,
+		kmdc_coa.acc_name_lv2,
+		kmdc_coa.acc_name_lv3,
+		kmdc_coa.subacc_name_lv1,
+		kmdc_coa.subacc_name_lv2
+		FROM quantity_totals qt
+		LEFT JOIN gl ON qt.ky_stc= gl.ky_stc
+		--LEFT JOIN subpublic.da_user02_profit_cpsx_thc_n1 ct ON qt.ky_stc = ct.ky_stc AND qt.c_kho = ct.c_kho
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh ON REPLACE(REPLACE(kh.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(qt.khach_hang, '\n', ''), '\r', '')
+		--old: LEFT JOIN subpublic.da_user02_oracle_coa_accsubacc_thc_n1 coa on coa.pk_acc_subacc = gl.acc_sub
+		LEFT JOIN 
+			(SELECT * 
+			FROM subpublic.da_user02_oracle_coa_accsubacc_thc_n1 coa 
+			LEFT JOIN thc.da_thc_profit_khoanmucdieuchinh_n1 kmdc
+				on coa.subacc_name_lv1 = kmdc.key_chi_tieu )  kmdc_coa on kmdc_coa.pk_acc_subacc = gl.acc_sub
+		WHERE (kmdc_coa.rule_pb IS NOT NULL AND kmdc_coa.loai_cp='CP PB theo SL') OR gl.acc IN ('642','641','711','811')
+		--LEFT JOIN dt ON gl.ky_stc=dt.ky_sqt
+		--thêm mới
+		/* Note mục đích lấy lv1 ở coa map với chi_tieu của điều chỉnh để  lấy ra ten_kmcp_lv1-5 cho đúng ý của mình)*/
+	
+	--UNION với doanh thuu
+	UNION ALL
+	SELECT  dt.bu,
+			dt.ky_sqt::date,
+			dt.c_kho,
+			dt.khach_hang,
+			dt.san_pham,
+			dt.than_tp,
+			dt.nhom_sp_lv1,
+			dt.nhom_sp_lv2,
+			gl.net_value as chi_phi,
+			0 AS so_luong,
+			dt.doanh_thu AS doanh_thu,
+			0 as ty_le_soluong,
+			--old: qt.c_ty_le_theo_ky_stc AS ty_le_soluong,
+			CASE	
+				WHEN kmdc_coa.rule_pb = 'dt_xe' then  dt.dt_tl_xe
+				WHEN kmdc_coa.rule_pb = 'dt_dau' then  dt.dt_tl_dau
+				WHEN kmdc_coa.rule_pb = 'dt_than_trau' then  dt.dt_tl_than_trau
+				ELSE dt.dt_tl_than_trau
+			END AS ty_le_doanhthu,
+			CASE 
+				WHEN kmdc_coa.ten_kmcp_lv1 IS NOT NULL AND kmdc_coa.loai_cp ='CP PB theo DT' THEN kmdc_coa.ten_kmcp_lv1
+					WHEN gl.acc IN ('515') THEN kmdc_coa.acc_name_lv1--'CP tài chính'
+					--WHEN LEFT(t1.account, 3) IN ('632') THEN 'CP giá vốn'
+					WHEN gl.acc IN ('635') THEN kmdc_coa.acc_name_lv1 --'CP tài chính'
+					WHEN gl.acc IN ('641', '642') THEN  kmdc_coa.acc_name_lv1--'CP bán hàng, quản lý'
+					WHEN gl.acc IN ('711', '811') THEN  kmdc_coa.acc_name_lv1--THEN 'CP khác'
+					ELSE gl.acc
+				END AS ten_kmcp_lv1,
+			CASE 
+				WHEN kmdc_coa.ten_kmcp_lv2 IS NOT NULL AND kmdc_coa.loai_cp ='CP PB theo DT' THEN kmdc_coa.ten_kmcp_lv2
+					WHEN gl.acc IN ('515') THEN kmdc_coa.acc_name_lv2 --'CP tài chính'
+					--WHEN LEFT(t1.account, 3) IN ('632') THEN 'CP giá vốn'
+					WHEN gl.acc IN ('635') THEN kmdc_coa.acc_name_lv2--'CP tài chính'
+					WHEN gl.acc IN ('642') THEN kmdc_coa.acc_name_lv2--'CP quản lý'
+					WHEN gl.acc IN ('641') THEN kmdc_coa.acc_name_lv2 --'CP bán hàng'
+					WHEN gl.acc IN ('711', '811') THEN kmdc_coa.acc_name_lv2 --'CP khác'
+					ELSE gl.acc
+				END AS ten_kmcp_lv2,
+			CASE 
+				WHEN kmdc_coa.ten_kmcp_lv3 IS NOT NULL AND kmdc_coa.loai_cp ='CP PB theo DT' THEN kmdc_coa.ten_kmcp_lv3
+					WHEN gl.acc IN ('515') THEN kmdc_coa.acc_name_lv3 --'CP tài chính'
+					--WHEN LEFT(t1.account, 3) IN ('632') THEN 'CP giá vốn'
+					WHEN gl.acc IN ('635') THEN kmdc_coa.acc_name_lv3 --'CP tài chính'
+					WHEN gl.acc IN ('642') THEN kmdc_coa.acc_name_lv3 --'CP quản lý'
+					WHEN gl.acc IN ('641') THEN kmdc_coa.acc_name_lv3 --'CP bán hàng'
+					WHEN gl.acc IN ('711', '811') THEN kmdc_coa.acc_name_lv3-- 'CP khác'
+					ELSE gl.acc
+				END AS ten_kmcp_lv3,
+			CASE 
+				WHEN kmdc_coa.ten_kmcp_lv4 IS NOT NULL AND kmdc_coa.loai_cp ='CP PB theo DT' THEN kmdc_coa.ten_kmcp_lv4
+					WHEN gl.acc IN ('515') THEN kmdc_coa.subacc_name_lv1 --'CP tài chính'
+					--WHEN LEFT(t1.account, 3) IN ('632') THEN 'CP giá vốn'
+					WHEN gl.acc IN ('635') THEN kmdc_coa.subacc_name_lv1  --'CP tài chính'
+					WHEN gl.acc IN ('642') THEN kmdc_coa.subacc_name_lv1 --'CP quản lý'
+					WHEN gl.acc IN ('641') THEN kmdc_coa.subacc_name_lv1 --'CP bán hàng'
+					WHEN gl.acc IN ('711', '811') THEN kmdc_coa.subacc_name_lv1 -- 'CP khác'
+					ELSE gl.acc
+				END AS ten_kmcp_lv4,
+			CASE 
+				WHEN kmdc_coa.ten_kmcp_lv5 IS NOT NULL AND kmdc_coa.loai_cp ='CP PB theo DT' THEN kmdc_coa.subacc_name_lv2
+					WHEN gl.acc IN ('515') THEN kmdc_coa.subacc_name_lv2--'CP tài chính'
+					--WHEN LEFT(t1.account, 3) IN ('632') THEN 'CP giá vốn'
+					WHEN gl.acc IN ('635') THEN kmdc_coa.subacc_name_lv2 --'CP tài chính'
+					WHEN gl.acc IN ('642') THEN kmdc_coa.subacc_name_lv2 --'CP quản lý'
+					WHEN gl.acc IN ('641') THEN kmdc_coa.subacc_name_lv2--'CP bán hàng'
+					WHEN gl.acc IN ('711', '811') THEN kmdc_coa.subacc_name_lv2--'CP khác'
+					ELSE gl.acc
+				END AS ten_kmcp_lv5,
+		CASE 
+			WHEN kmdc_coa.loai_cp IS NOT NULL THEN kmdc_coa.loai_cp 
+		     ELSE 'CP PB theo DT'
+		END as loai_cp,
+		CASE	
+				WHEN kmdc_coa.rule_pb = 'dt_xe' then  (gl.net_value *dt.dt_tl_xe)
+				WHEN kmdc_coa.rule_pb = 'dt_dau' then  (gl.net_value *dt.dt_tl_dau)
+				WHEN kmdc_coa.rule_pb = 'dt_than_trau' then  (gl.net_value *dt.dt_tl_than_trau)
+		ELSE (gl.net_value *dt.dt_tl_than_trau)
+		END AS net_value,
+			--old: (gl.net_value * qt.c_ty_le_theo_ky_stc) AS net_value,
+		kmdc_coa.rule_pb as note,
+		gl.acc,
+		gl.subaccount as sub,
+		gl.acc_sub,
+		kmdc_coa.acc_name_lv1,
+		kmdc_coa.acc_name_lv2,
+		kmdc_coa.acc_name_lv3,
+		kmdc_coa.subacc_name_lv1,
+		kmdc_coa.subacc_name_lv2
+		FROM dt 
+		LEFT JOIN gl ON dt.ky_sqt= gl.ky_stc
+		--LEFT JOIN subpublic.da_user02_profit_cpsx_thc_n1 ct ON qt.ky_stc = ct.ky_stc AND qt.c_kho = ct.c_kho
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh ON REPLACE(REPLACE(kh.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(dt.khach_hang, '\n', ''), '\r', '')
+		--old: LEFT JOIN subpublic.da_user02_oracle_coa_accsubacc_thc_n1 coa on coa.pk_acc_subacc = gl.acc_sub
+		LEFT JOIN 
+			(SELECT * 
+			FROM subpublic.da_user02_oracle_coa_accsubacc_thc_n1 coa 
+			LEFT JOIN thc.da_thc_profit_khoanmucdieuchinh_n1 kmdc
+				on coa.subacc_name_lv1 = kmdc.key_chi_tieu )  kmdc_coa on kmdc_coa.pk_acc_subacc = gl.acc_sub
+		WHERE (kmdc_coa.rule_pb IS NOT NULL AND kmdc_coa.loai_cp='CP PB theo DT') OR gl.acc IN ('635','515')
+	),
+
+	----3. CPNL
+	cpnl AS (
+		SELECT qt.bu,
+			qt.ky_stc,
+			qt.c_kho,
+			qt.khach_hang,
+			qt.san_pham,
+			qt.than_tp,
+			qt.nhom_sp_lv1,
+			qt.nhom_sp_lv2,
+			qt.c_cpnl as chi_phi,
+			qt.c_quantity AS so_luong,
+			0 AS doanh_thu,
+			0 AS ty_le_soluong,  --vì theo KH
+			0 AS ty_le_doanhthu,  --vì theo KH
+			'CP giá vốn' AS ten_kmcp_lv1,
+			'CP nguyên liệu' AS ten_kmcp_lv2,
+			'CP nguyên liệu' AS ten_kmcp_lv3,
+			'CP nguyên liệu' AS ten_kmcp_lv4,
+			'CP nguyên liệu' AS ten_kmcp_lv5,
+			'CP theo KH' as loai_cp,
+			 qt.c_cpnl  AS net_value,
+		null as note,
+		null as acc,
+		null as  sub,
+		null as acc_sub,
+		null as acc_name_lv1,
+		null as acc_name_lv2,
+		null as acc_name_lv3,
+		null as subacc_name_lv1,
+		null as subacc_name_lv2
+		FROM quantity_totals qt
+		--LEFT JOIN gl ON qt.ky_stc= gl.ky_stc
+		--LEFT JOIN subpublic.da_user02_profit_cpsx_thc_n1 ct ON qt.ky_stc = ct.ky_stc AND qt.c_kho = ct.c_kho
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh ON REPLACE(REPLACE(kh.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(qt.khach_hang, '\n', ''), '\r', '')
+		--LEFT JOIN subpublic.da_user02_oracle_coa_accsubacc_thc_n1 coa on coa.pk_acc_subacc = gl.acc_sub
+	),
+	---4. CPSX
+
+	cpsx as (
+	 SELECT qt.bu,
+			qt.ky_stc,
+			qt.c_kho,
+			qt.khach_hang,
+			qt.san_pham,
+			qt.than_tp,
+			qt.nhom_sp_lv1,
+			qt.nhom_sp_lv2,
+			cpsx_raw.net_value as chi_phi,
+			qt.c_quantity AS so_luong,
+			0 AS doanh_thu,
+			qt.c_ty_le_theo_kho AS ty_le_soluong,  --tỷ lệ theo kho
+			0 AS ty_le_doanhthu,  
+			'CP giá vốn' AS ten_kmcp_lv1,
+			'CP sản xuất' AS ten_kmcp_lv2,
+			'CP sản xuất' AS ten_kmcp_lv3,
+			'CP sản xuất' AS ten_kmcp_lv4,
+			cpsx_raw.chi_phi AS ten_kmcp_lv5,
+			'CP PB theo SL' as loai_cp,
+			(cpsx_raw.net_value * qt.c_ty_le_theo_kho) AS net_value,
+		null as note,
+		null as acc,
+		null as sub,
+		null as acc_sub,
+		null as acc_name_lv1,
+		null as acc_name_lv2,
+		null as acc_name_lv3,
+		null as subacc_name_lv1,
+		null as subacc_name_lv2
+		FROM quantity_totals qt
+		--LEFT JOIN gl ON qt.ky_stc= gl.ky_stc
+		LEFT JOIN (	
+			SELECT 
+				ky_stc,
+				chi_phi,
+				c_kho,
+				sum(net_value) AS net_value
+			FROM subpublic.da_user02_profit_cpsx_thc_n1
+			WHERE c_kho <> '0' AND phan_loai = 'ACTUAL' AND don_vi_su_dung <> 'Thuận Hải'
+			GROUP BY  
+				ky_stc,
+				chi_phi,
+				c_kho) cpsx_raw ON qt.ky_stc = cpsx_raw.ky_stc AND qt.c_kho = cpsx_raw.c_kho  --old: LEFT JOIN subpublic.da_user02_profit_cpsx_thc_n1 ct ON qt.ky_stc = ct.ky_stc AND qt.c_kho = ct.c_kho
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh ON REPLACE(REPLACE(kh.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(qt.khach_hang, '\n', ''), '\r', '')
+		--LEFT JOIN subpublic.da_user02_oracle_coa_accsubacc_thc_n1 coa on coa.pk_acc_subacc = gl.acc_sub
+
+	),  --5. CP PT DẦU THCORP
+	cpdau as (
+	 SELECT dt.bu,
+			dt.ky_sqt,
+			dt.c_kho,
+			dt.khach_hang,
+			dt.san_pham,
+			dt.than_tp,
+			dt.nhom_sp_lv1,
+			dt.nhom_sp_lv2,
+			cpsx_raw.net_value as chi_phi,
+			0 AS so_luong,
+			dt.doanh_thu,
+			0 AS ty_le_soluong, 
+			dt.dt_tl_dau_theo_kho AS ty_le_doanh_thu,   --tỷ lệ theo kho
+			'CP giá vốn' AS ten_kmcp_lv1,
+			'CP giá vốn khác' AS ten_kmcp_lv2,
+			'CP PT Dầu_THCORP' AS ten_kmcp_lv3,
+			'CP PT Dầu_THCORP' AS ten_kmcp_lv4,
+			cpsx_raw.chi_phi AS ten_kmcp_lv5,
+			'CP PB theo DT' as loai_cp,
+			(cpsx_raw.net_value * dt.dt_tl_dau_theo_kho) AS net_value,
+		null as note,
+		null as acc,
+		null as sub,
+		null as acc_sub,
+		null as acc_name_lv1,
+		null as acc_name_lv2,
+		null as acc_name_lv3,
+		null as subacc_name_lv1,
+		null as subacc_name_lv2
+		FROM dt
+		--LEFT JOIN gl ON qt.ky_stc= gl.ky_stc
+		LEFT JOIN (	
+			SELECT 
+				ky_stc,
+				chi_phi,
+				c_kho,
+				sum(net_value)*-1 AS net_value
+			FROM subpublic.da_user02_profit_cpsx_thc_n1
+			WHERE c_kho <> '0' AND phan_loai = 'ACTUAL' AND don_vi_su_dung IN ('Tân Thuận', 'Võ Gia','Xuân Lộc')
+			GROUP BY  
+				ky_stc,
+				chi_phi,
+				c_kho) cpsx_raw ON dt.ky_sqt = cpsx_raw.ky_stc AND dt.c_kho = cpsx_raw.c_kho  --old: LEFT JOIN subpublic.da_user02_profit_cpsx_thc_n1 ct ON qt.ky_stc = ct.ky_stc AND qt.c_kho = ct.c_kho
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh ON REPLACE(REPLACE(kh.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(dt.khach_hang, '\n', ''), '\r', '')
+    ),
+	
+	
+	-----5. Các khoản mục điều chỉnh
+
+	dc_sl as (
+	 SELECT qt.bu,
+			qt.ky_stc,
+			qt.c_kho,
+			qt.khach_hang,
+			qt.san_pham,
+			qt.than_tp,
+			qt.nhom_sp_lv1,
+			qt.nhom_sp_lv2,
+			dc.net_value as chi_phi,
+			qt.c_quantity AS so_luong,
+			0 AS doanh_thu,
+			CASE 
+				WHEN kmdc.rule_pb = 'sl_than' THEN qt.c_ty_le_theo_ky_stc_only_than 
+				WHEN kmdc.rule_pb = 'sl_than_thc' THEN qt.c_ty_le_theo_ky_stc_only_than_thc
+				WHEN kmdc.rule_pb = 'sl_than_trau' THEN qt.c_ty_le_theo_ky_stc
+				ELSE 0
+			END AS ty_le_soluong,
+			--old: qt.c_ty_le_theo_ky_stc_only_than_thc AS ty_le_soluong,  
+			0 AS ty_le_doanhthu,  
+			kmdc.ten_kmcp_lv1,
+			kmdc.ten_kmcp_lv2,
+			kmdc.ten_kmcp_lv3,
+			kmdc.ten_kmcp_lv4,
+			kmdc.ten_kmcp_lv5,
+			kmdc.loai_cp,
+			CASE 
+				WHEN kmdc.rule_pb = 'sl_than' THEN qt.c_ty_le_theo_ky_stc_only_than *dc.net_value
+				WHEN kmdc.rule_pb = 'sl_than_thc' THEN qt.c_ty_le_theo_ky_stc_only_than_thc *dc.net_value
+				WHEN kmdc.rule_pb = 'sl_than_trau' THEN qt.c_ty_le_theo_ky_stc *dc.net_value
+				ELSE 0
+			END AS net_value,
+			--old: (dc.net_value * qt.c_ty_le_theo_ky_stc_only_than_thc) AS net_value,
+		null as note,
+		null as acc,
+		null as sub,
+		null as acc_sub,
+		null as acc_name_lv1,
+		null as acc_name_lv2,
+		null as acc_name_lv3,
+		null as subacc_name_lv1,
+		null as subacc_name_lv2
+		FROM quantity_totals qt
+		--LEFT JOIN gl ON qt.ky_stc= gl.ky_stc
+		LEFT JOIN 
+			(select ky,chi_tieu_dieu_chinh,net_value from thc.da_thc_profit_pl_adj_n1
+			--where bu ='THC' and extract(year from ky_stc) IN ('2023','2024')
+			--WHERE chi_tieu_dieu_chinh IN ('PT_DNA','PT_VNS')
+			WHERE loai_cp='CP PB theo SL'
+			UNION
+			SELECT ky_stc,
+			'CP hoa hồng_PB' as chi_tieu,
+			 sum(net_value) as net_value
+			from subpublic.da_user02_profit_cphh_thc_n2
+			WHERE bu='THC' and acc_true <>'CP theo KH'
+			GROUP BY ky_stc
+			) dc ON qt.ky_stc = dc.ky
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh ON REPLACE(REPLACE(kh.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(qt.khach_hang, '\n', ''), '\r', '')
+		LEFT JOIN thc.da_thc_profit_khoanmucdieuchinh_n1 kmdc on kmdc.key_chi_tieu = dc.chi_tieu_dieu_chinh
+	),
+	dc_dt as (
+	 SELECT dt.bu,
+			dt.ky_sqt,
+			dt.c_kho,
+			dt.khach_hang,
+			dt.san_pham,
+			dt.than_tp,
+			dt.nhom_sp_lv1,
+			dt.nhom_sp_lv2,
+			dc.net_value as chi_phi,
+			0 AS so_luong,
+			dt.doanh_thu,
+			0 AS ty_le_soluong,  
+			dt.dt_tl_than_trau AS ty_le_doanhthu,  
+			kmdc.ten_kmcp_lv1,
+			kmdc.ten_kmcp_lv2,
+			kmdc.ten_kmcp_lv3,
+			kmdc.ten_kmcp_lv4,
+			kmdc.ten_kmcp_lv5,
+			kmdc.loai_cp,
+			(dc.net_value * dt.dt_tl_than_trau) AS net_value,
+		null as note,
+		null as acc,
+		null as sub,
+		null as acc_sub,
+		null as acc_name_lv1,
+		null as acc_name_lv2,
+		null as acc_name_lv3,
+		null as subacc_name_lv1,
+		null as subacc_name_lv2
+		FROM dt
+		--LEFT JOIN gl ON qt.ky_stc= gl.ky_stc
+		LEFT JOIN 
+			(select ky,chi_tieu_dieu_chinh,net_value from thc.da_thc_profit_pl_adj_n1
+			--where bu ='THC' and extract(year from ky_stc) IN ('2023','2024')
+			--WHERE chi_tieu_dieu_chinh IN ('Trích lãi HDTG','Trích lãi vay')
+			WHERE loai_cp='CP PB theo DT'
+			) dc ON dt.ky_sqt = dc.ky
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh ON REPLACE(REPLACE(kh.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(dt.khach_hang, '\n', ''), '\r', '')
+		LEFT JOIN thc.da_thc_profit_khoanmucdieuchinh_n1 kmdc on kmdc.key_chi_tieu = dc.chi_tieu_dieu_chinh
+	),
+	
+	cphh as (
+	 SELECT qt.bu,
+			qt.ky_stc,
+			qt.c_kho,
+			qt.khach_hang,
+			qt.san_pham,
+			qt.than_tp,
+			qt.nhom_sp_lv1,
+			qt.nhom_sp_lv2,
+			cphh_raw.net_value as chi_phi,
+			qt.c_quantity AS so_luong,
+			0 AS doanh_thu,
+			qt.c_ty_le_theo_khach_hang AS ty_le_soluong,  --tỷ lệ theo kho
+			0 AS ty_le_doanhthu,  
+			'CP bán hàng' AS ten_kmcp_lv1,
+			'CP hoa hồng' AS ten_kmcp_lv2,
+			'CP hoa hồng' AS ten_kmcp_lv3,
+			'CP hoa hồng' AS ten_kmcp_lv4,
+			cphh_raw.chi_phi AS ten_kmcp_lv5,
+			'CP PB theo SL' as loai_cp,
+			(cphh_raw.net_value * qt.c_ty_le_theo_khach_hang) AS net_value,
+		null as note,
+		null as acc,
+		null as sub,
+		null as acc_sub,
+		null as acc_name_lv1,
+		null as acc_name_lv2,
+		null as acc_name_lv3,
+		null as subacc_name_lv1,
+		null as subacc_name_lv2
+		FROM quantity_totals qt
+		--LEFT JOIN gl ON qt.ky_stc= gl.ky_stc
+		LEFT JOIN (	
+			SELECT ky_stc,
+			ten_kmcp_lv5 as chi_phi,
+			khach_hang,
+			 sum(net_value) as net_value
+			from subpublic.da_user02_profit_cphh_thc_n2
+			WHERE bu='THC' and acc_true ='CP theo KH'
+			GROUP BY 
+				ky_stc,
+				ten_kmcp_lv5, 
+				--old khi lấy theo kỳ
+		      --khach_hang) cphh_raw ON qt.ky_stc = cphh_raw.ky_stc AND qt.khach_hang = cphh_raw.khach_hang  --old: LEFT JOIN subpublic.da_user02_profit_cpsx_thc_n1 ct ON qt.ky_stc = ct.ky_stc AND qt.c_kho = ct.c_kho
+		        --new khi lấy theo cả năm
+				khach_hang) cphh_raw ON (date_part('year', qt.ky_stc)) = (date_part('year', cphh_raw.ky_stc)) AND qt.khach_hang = cphh_raw.khach_hang
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh ON REPLACE(REPLACE(kh.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(qt.khach_hang, '\n', ''), '\r', '')
+		--LEFT JOIN subpublic.da_user02_oracle_coa_accsubacc_thc_n1 coa on coa.pk_acc_subacc = gl.acc_sub
+	),
+	
+	cplogs as (
+	 SELECT qt.bu,
+			qt.ky_stc,
+			qt.c_kho,
+			qt.khach_hang,
+			qt.san_pham,
+			qt.than_tp,
+			qt.nhom_sp_lv1,
+			qt.nhom_sp_lv2,
+			cplogs_raw.net_value as chi_phi,
+			qt.c_quantity AS so_luong,
+			0 AS doanh_thu,
+			qt.c_ty_le_theo_khach_hang_month AS ty_le_soluong,  --tỷ lệ theo kho
+			0 AS ty_le_doanhthu,  
+			'CP bán hàng' AS ten_kmcp_lv1,
+			'CP Logs' AS ten_kmcp_lv2,
+			'CP Logs' AS ten_kmcp_lv3,
+			'CP Logs' AS ten_kmcp_lv4,
+			cplogs_raw.chi_phi AS ten_kmcp_lv5,
+			'CP PB theo SL' as loai_cp,
+			(cplogs_raw.net_value * qt.c_ty_le_theo_khach_hang_month) AS net_value,
+		null as note,
+		null as acc,
+		null as sub,
+		null as acc_sub,
+		null as acc_name_lv1,
+		null as acc_name_lv2,
+		null as acc_name_lv3,
+		null as subacc_name_lv1,
+		null as subacc_name_lv2
+		FROM quantity_totals qt
+		--LEFT JOIN gl ON qt.ky_stc= gl.ky_stc
+		LEFT JOIN (	
+			SELECT 
+				c_trans_period as ky_stc,
+				'CP Logs' as chi_phi,
+				khach_hang,
+				sum(thanh_tien) as net_value
+			FROM subpublic.da_user02_odoo_log_n2
+			GROUP BY
+				c_trans_period,
+				khach_hang) cplogs_raw
+		
+			--lấy theo kỳ chứ không theo năm
+				ON qt.ky_stc = cplogs_raw.ky_stc AND qt.khach_hang = cplogs_raw.khach_hang
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh ON REPLACE(REPLACE(kh.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(qt.khach_hang, '\n', ''), '\r', '')
+		--LEFT JOIN subpublic.da_user02_oracle_coa_accsubacc_thc_n1 coa on coa.pk_acc_subacc = gl.acc_sub
+	),
+	
+	--CL CP LOGS
+	cl_cplogs AS (
+	
+	SELECT 
+        ky_stc,
+		'CP Logs_CL' as chi_phi,
+        SUM(net_value_1) - SUM(net_value_2) AS net_value
+    FROM (
+        -- Query 1
+        SELECT 
+            DATE_TRUNC('month', gl.gl_date)::DATE AS ky_stc,
+            SUM(gl.accounted_dr - gl.accounted_cr) AS net_value_1,
+            0 AS net_value_2
+        FROM 
+            public.da_gl001 gl
+        WHERE 
+            DATE_TRUNC('month', gl.gl_date) >= '2024-01-01'
+            AND gl.company = '110'
+            AND gl.account = '641702' 
+            AND gl.subaccount IN ('0202', '0203', '0204', '0205')
+        GROUP BY 
+            DATE_TRUNC('month', gl.gl_date)::DATE
+
+        UNION ALL
+
+        -- Query 2
+        SELECT 
+            c_trans_period AS ky_stc,
+            0 AS net_value_1,
+            SUM(thanh_tien) AS net_value_2
+        FROM 
+            subpublic.da_user02_odoo_log_n2
+        GROUP BY 
+            c_trans_period
+    ) AS union_data
+    GROUP BY 
+        ky_stc
+	
+),
+pb_cl_cplogs as (
+	 SELECT qt.bu,
+			qt.ky_stc,
+			qt.c_kho,
+			qt.khach_hang,
+			qt.san_pham,
+			qt.than_tp,
+			qt.nhom_sp_lv1,
+			qt.nhom_sp_lv2,
+			cl_cplogs.net_value as chi_phi,
+			qt.c_quantity AS so_luong,
+			0 AS doanh_thu,
+			qt.c_ty_le_theo_ky_stc AS ty_le_soluong,  --tỷ lệ theo kho
+			0 AS ty_le_doanhthu,  
+			'CP bán hàng' AS ten_kmcp_lv1,
+			'CP Logs_CL' AS ten_kmcp_lv2,
+			'CP Logs_CL' AS ten_kmcp_lv3,
+			'CP Logs_CL' AS ten_kmcp_lv4,
+			cl_cplogs.chi_phi AS ten_kmcp_lv5,
+			'CP PB theo SL' as loai_cp,
+			(cl_cplogs.net_value * qt.c_ty_le_theo_ky_stc) AS net_value,
+		null as note,
+		null as acc,
+		null as sub,
+		null as acc_sub,
+		null as acc_name_lv1,
+		null as acc_name_lv2,
+		null as acc_name_lv3,
+		null as subacc_name_lv1,
+		null as subacc_name_lv2
+		FROM quantity_totals qt
+		--LEFT JOIN gl ON qt.ky_stc= gl.ky_stc
+		LEFT JOIN cl_cplogs
+		
+			--lấy theo kỳ chứ không theo năm
+				ON qt.ky_stc = cl_cplogs.ky_stc ---AND qt.khach_hang = cplogs_raw.khach_hang
+		LEFT JOIN subpublic.da_user02_profit_dim_dmkh_n2 kh ON REPLACE(REPLACE(kh.ten_khach_hang_theo_source, '\n', ''), '\r', '') = REPLACE(REPLACE(qt.khach_hang, '\n', ''), '\r', '')
+		--LEFT JOIN subpublic.da_user02_oracle_coa_accsubacc_thc_n1 coa on coa.pk_acc_subacc = gl.acc_sub
+)
+
+
+
+	
+	-------
+	SELECT * FROM xuly
+	where xuly.chi_phi<>0
+
+	UNION ALL
+	SELECT * FROM cpnl
+	UNION ALL
+	SELECT * FROM cpsx
+	UNION ALL
+	SELECT * FROM cpdau
+	UNION ALL
+	SELECT * FROM dc_sl
+	UNION ALL
+	SELECT * FROM dc_dt
+	UNION ALL
+	SELECT * FROM cphh
+	UNION ALL
+	SELECT * FROM cplogs
+	UNION ALL
+	SELECT * FROM pb_cl_cplogs
+	
+);
+
