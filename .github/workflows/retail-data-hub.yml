@@ -1,0 +1,46 @@
+# Runs the Retail Data Hub pipeline every morning and commits the refreshed data.
+name: Retail Data Hub - daily pipeline
+
+on:
+  schedule:
+    - cron: "0 23 * * *"      # 06:00 Vietnam time
+  workflow_dispatch:           # "Run workflow" button for a manual run
+
+permissions:
+  contents: write
+
+concurrency:
+  group: retail-data-hub
+  cancel-in-progress: false
+
+env:
+  HUB_DIR: "0. [Python] Retail Data Hub"
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: "${{ env.HUB_DIR }}/requirements.txt"
+
+      - name: Install dependencies
+        run: pip install -r "$HUB_DIR/requirements.txt"
+
+      - name: Extract, transform, check quality, publish
+        id: run
+        run: python "$HUB_DIR/pipeline/run.py"
+
+      - name: Commit refreshed data (also on failure, so the run log is kept)
+        if: always()
+        run: |
+          git config user.name  "retail-data-hub-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A "$HUB_DIR/lake" "$HUB_DIR/state" "$HUB_DIR/output" "$HUB_DIR/README.md"
+          git diff --cached --quiet || git commit -m "data-hub: daily run $(date -u +%F)"
+          git push

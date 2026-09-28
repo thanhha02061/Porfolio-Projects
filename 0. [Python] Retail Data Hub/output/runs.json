@@ -1,0 +1,78 @@
+[
+ {
+  "run_at": "2026-09-29T02:51:25+07:00",
+  "data_through": "2026-09-28",
+  "status": "success",
+  "seconds": 11.3,
+  "loaded": {
+   "pos": {
+    "days": 120,
+    "from": "2026-06-01",
+    "to": "2026-09-28"
+   },
+   "shopee": {
+    "days": 120,
+    "from": "2026-06-01",
+    "to": "2026-09-28"
+   },
+   "tiktok": {
+    "days": 120,
+    "from": "2026-06-01",
+    "to": "2026-09-28"
+   },
+   "web": {
+    "days": 120,
+    "from": "2026-06-01",
+    "to": "2026-09-28"
+   },
+   "erp": {
+    "days": 120,
+    "from": "2026-06-01",
+    "to": "2026-09-28"
+   }
+  },
+  "partitions_pruned": 0,
+  "files_read": 455,
+  "files_in_lake": 600,
+  "checks_passed": 8,
+  "checks_total": 9
+ },
+ {
+  "run_at": "2026-09-29T02:51:28+07:00",
+  "data_through": "2026-09-28",
+  "status": "success",
+  "seconds": 2.6,
+  "loaded": {
+   "pos": {
+    "days": 0,
+    "from": null,
+    "to": null
+   },
+   "shopee": {
+    "days": 0,
+    "from": null,
+    "to": null
+   },
+   "tiktok": {
+    "days": 0,
+    "from": null,
+    "to": null
+   },
+   "web": {
+    "days": 0,
+    "from": null,
+    "to": null
+   },
+   "erp": {
+    "days": 0,
+    "from": null,
+    "to": null
+   }
+  },
+  "partitions_pruned": 0,
+  "files_read": 455,
+  "files_in_lake": 600,
+  "checks_passed": 8,
+  "checks_total": 9
+ }
+]

@@ -1,0 +1,93 @@
+[
+ {
+  "store_code": "ONLINE",
+  "store_name": "Online",
+  "city": "Online",
+  "orders": 11000,
+  "net_30d": 4976689000
+ },
+ {
+  "store_code": "S06",
+  "store_name": "Tân Bình",
+  "city": "HCM",
+  "orders": 794,
+  "net_30d": 379768200
+ },
+ {
+  "store_code": "S08",
+  "store_name": "Cầu Giấy",
+  "city": "HN",
+  "orders": 817,
+  "net_30d": 370817900
+ },
+ {
+  "store_code": "S05",
+  "store_name": "Gò Vấp",
+  "city": "HCM",
+  "orders": 807,
+  "net_30d": 370238300
+ },
+ {
+  "store_code": "S12",
+  "store_name": "Thủ Dầu Một",
+  "city": "BD",
+  "orders": 775,
+  "net_30d": 359458800
+ },
+ {
+  "store_code": "S01",
+  "store_name": "Quận 1",
+  "city": "HCM",
+  "orders": 826,
+  "net_30d": 359278900
+ },
+ {
+  "store_code": "S09",
+  "store_name": "Đống Đa",
+  "city": "HN",
+  "orders": 805,
+  "net_30d": 355988600
+ },
+ {
+  "store_code": "S02",
+  "store_name": "Quận 3",
+  "city": "HCM",
+  "orders": 766,
+  "net_30d": 352531000
+ },
+ {
+  "store_code": "S10",
+  "store_name": "Hải Châu",
+  "city": "DN",
+  "orders": 736,
+  "net_30d": 348618700
+ },
+ {
+  "store_code": "S11",
+  "store_name": "Biên Hòa",
+  "city": "DNai",
+  "orders": 770,
+  "net_30d": 347780900
+ },
+ {
+  "store_code": "S04",
+  "store_name": "Thủ Đức",
+  "city": "HCM",
+  "orders": 773,
+  "net_30d": 347394000
+ },
+ {
+  "store_code": "S07",
+  "store_name": "Hoàn Kiếm",
+  "city": "HN",
+  "orders": 733,
+  "net_30d": 336575200
+ },
+ {
+  "store_code": "S03",
+  "store_name": "Quận 7",
+  "city": "HCM",
+  "orders": 708,
+  "net_30d": 313502100
+ }
+]

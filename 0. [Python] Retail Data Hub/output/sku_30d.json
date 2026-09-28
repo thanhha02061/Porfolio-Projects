@@ -1,0 +1,252 @@
+[
+ {
+  "master_sku": "LM-SER-05",
+  "product_name": "Lumière Peptide Serum",
+  "category": "Serum",
+  "units_30d": 1730,
+  "net_30d": 935925400,
+  "on_hand": 916,
+  "stock_value": 174040000,
+  "days_cover": 15.9
+ },
+ {
+  "master_sku": "LM-SER-04",
+  "product_name": "Lumière HA Plus",
+  "category": "Serum",
+  "units_30d": 1743,
+  "net_30d": 860604600,
+  "on_hand": 1158,
+  "stock_value": 208671600,
+  "days_cover": 19.9
+ },
+ {
+  "master_sku": "LM-SER-03",
+  "product_name": "Lumière Retinol 0.3%",
+  "category": "Serum",
+  "units_30d": 1680,
+  "net_30d": 721615700,
+  "on_hand": 1384,
+  "stock_value": 181165600,
+  "days_cover": 24.7
+ },
+ {
+  "master_sku": "LM-SER-02",
+  "product_name": "Lumière Niacinamide 10%",
+  "category": "Serum",
+  "units_30d": 1743,
+  "net_30d": 633912800,
+  "on_hand": 928,
+  "stock_value": 126672000,
+  "days_cover": 16.0
+ },
+ {
+  "master_sku": "LM-SER-01",
+  "product_name": "Lumière Vitamin C 15%",
+  "category": "Serum",
+  "units_30d": 1765,
+  "net_30d": 541798100,
+  "on_hand": 1176,
+  "stock_value": 111367200,
+  "days_cover": 20.0
+ },
+ {
+  "master_sku": "LM-SUN-03",
+  "product_name": "Lumière Stick SPF50",
+  "category": "Sunscreen",
+  "units_30d": 1672,
+  "net_30d": 498962900,
+  "on_hand": 885,
+  "stock_value": 87792000,
+  "days_cover": 15.9
+ },
+ {
+  "master_sku": "LM-MSK-03",
+  "product_name": "Lumière Sleeping Mask",
+  "category": "Mask",
+  "units_30d": 2022,
+  "net_30d": 470074600,
+  "on_hand": 934,
+  "stock_value": 83873200,
+  "days_cover": 13.9
+ },
+ {
+  "master_sku": "LM-SUN-02",
+  "product_name": "Lumière Tone-up SPF50",
+  "category": "Sunscreen",
+  "units_30d": 1581,
+  "net_30d": 399197400,
+  "on_hand": 1330,
+  "stock_value": 106267000,
+  "days_cover": 25.2
+ },
+ {
+  "master_sku": "LM-MOI-03",
+  "product_name": "Lumière Night Cream",
+  "category": "Moisturizer",
+  "units_30d": 1179,
+  "net_30d": 383917900,
+  "on_hand": 244,
+  "stock_value": 28889600,
+  "days_cover": 6.2
+ },
+ {
+  "master_sku": "LM-MOI-02",
+  "product_name": "Lumière Water Gel",
+  "category": "Moisturizer",
+  "units_30d": 1213,
+  "net_30d": 338753200,
+  "on_hand": 424,
+  "stock_value": 37100000,
+  "days_cover": 10.5
+ },
+ {
+  "master_sku": "LM-CLN-03",
+  "product_name": "Lumière Green Tea Clay",
+  "category": "Cleanser",
+  "units_30d": 1561,
+  "net_30d": 332944200,
+  "on_hand": 722,
+  "stock_value": 61297800,
+  "days_cover": 13.9
+ },
+ {
+  "master_sku": "LM-SUN-01",
+  "product_name": "Lumière UV Fluid SPF50",
+  "category": "Sunscreen",
+  "units_30d": 1561,
+  "net_30d": 318974500,
+  "on_hand": 1572,
+  "stock_value": 136135200,
+  "days_cover": 30.2
+ },
+ {
+  "master_sku": "LM-MOI-01",
+  "product_name": "Lumière Barrier Cream",
+  "category": "Moisturizer",
+  "units_30d": 1293,
+  "net_30d": 312496900,
+  "on_hand": 642,
+  "stock_value": 48150000,
+  "days_cover": 14.9
+ },
+ {
+  "master_sku": "LM-TON-03",
+  "product_name": "Lumière Calming Mist",
+  "category": "Toner",
+  "units_30d": 1215,
+  "net_30d": 293719700,
+  "on_hand": 408,
+  "stock_value": 34965600,
+  "days_cover": 10.1
+ },
+ {
+  "master_sku": "LM-TON-02",
+  "product_name": "Lumière Pore Toner",
+  "category": "Toner",
+  "units_30d": 1286,
+  "net_30d": 261988300,
+  "on_hand": 974,
+  "stock_value": 75679800,
+  "days_cover": 22.7
+ },
+ {
+  "master_sku": "LM-BDY-03",
+  "product_name": "Lumière Scrub Coffee",
+  "category": "Body",
+  "units_30d": 1248,
+  "net_30d": 256132500,
+  "on_hand": 1122,
+  "stock_value": 78652200,
+  "days_cover": 27.0
+ },
+ {
+  "master_sku": "LM-CLN-02",
+  "product_name": "Lumière Rice Water Gel",
+  "category": "Cleanser",
+  "units_30d": 1441,
+  "net_30d": 254100500,
+  "on_hand": 947,
+  "stock_value": 53884300,
+  "days_cover": 19.7
+ },
+ {
+  "master_sku": "LM-LIP-02",
+  "product_name": "Lumière Balm Honey",
+  "category": "Lip",
+  "units_30d": 1300,
+  "net_30d": 242012600,
+  "on_hand": 1128,
+  "stock_value": 93511200,
+  "days_cover": 26.0
+ },
+ {
+  "master_sku": "LM-CLN-01",
+  "product_name": "Lumière Gentle Foam",
+  "category": "Cleanser",
+  "units_30d": 1544,
+  "net_30d": 215469400,
+  "on_hand": 1216,
+  "stock_value": 58854400,
+  "days_cover": 23.6
+ },
+ {
+  "master_sku": "LM-TON-01",
+  "product_name": "Lumière Hydra Toner",
+  "category": "Toner",
+  "units_30d": 1252,
+  "net_30d": 208948000,
+  "on_hand": 524,
+  "stock_value": 27195600,
+  "days_cover": 12.6
+ },
+ {
+  "master_sku": "LM-BDY-02",
+  "product_name": "Lumière Body Lotion Milk",
+  "category": "Body",
+  "units_30d": 1245,
+  "net_30d": 208150000,
+  "on_hand": 1365,
+  "stock_value": 97734000,
+  "days_cover": 32.9
+ },
+ {
+  "master_sku": "LM-LIP-01",
+  "product_name": "Lumière Tint Rose",
+  "category": "Lip",
+  "units_30d": 1227,
+  "net_30d": 181983000,
+  "on_hand": 732,
+  "stock_value": 39015600,
+  "days_cover": 17.9
+ },
+ {
+  "master_sku": "LM-BDY-01",
+  "product_name": "Lumière Body Wash Peach",
+  "category": "Body",
+  "units_30d": 1237,
+  "net_30d": 160579100,
+  "on_hand": 869,
+  "stock_value": 34586200,
+  "days_cover": 21.1
+ },
+ {
+  "master_sku": "LM-MSK-02",
+  "product_name": "Lumière Sheet Mask Rice",
+  "category": "Mask",
+  "units_30d": 2032,
+  "net_30d": 111926700,
+  "on_hand": 438,
+  "stock_value": 10643400,
+  "days_cover": 6.5
+ },
+ {
+  "master_sku": "LM-MSK-01",
+  "product_name": "Lumière Sheet Mask Aloe",
+  "category": "Mask",
+  "units_30d": 2040,
+  "net_30d": 74453600,
+  "on_hand": 641,
+  "stock_value": 9166300,
+  "days_cover": 9.4
+ }
+]

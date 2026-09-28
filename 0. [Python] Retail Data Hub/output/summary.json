@@ -1,0 +1,54 @@
+{
+ "data_through": "2026-09-28",
+ "kpi": {
+  "net_30d": 9218641600,
+  "net_prev_30d": 8720055500,
+  "orders_30d": 20310,
+  "aov_30d": 453897,
+  "growth": 0.0572
+ },
+ "channel_mix": [
+  {
+   "channel": "pos",
+   "net": 4241952600
+  },
+  {
+   "channel": "shopee",
+   "net": 2274356200
+  },
+  {
+   "channel": "tiktok",
+   "net": 1776780400
+  },
+  {
+   "channel": "web",
+   "net": 925552400
+  }
+ ],
+ "lineage": [
+  {
+   "channel": "pos",
+   "rows_in_hub": 40526,
+   "valid_rows": 40526,
+   "mapped_rows": 40526
+  },
+  {
+   "channel": "shopee",
+   "rows_in_hub": 23415,
+   "valid_rows": 22094,
+   "mapped_rows": 22094
+  },
+  {
+   "channel": "tiktok",
+   "rows_in_hub": 18839,
+   "valid_rows": 17312,
+   "mapped_rows": 17291
+  },
+  {
+   "channel": "web",
+   "rows_in_hub": 9477,
+   "valid_rows": 9059,
+   "mapped_rows": 9059
+  }
+ ]
+}
