@@ -1,170 +1,163 @@
-# Retail Data Hub: 5 sources → 1 source of truth, refreshed automatically every morning
+# Retail Data Hub: 5 nguồn dữ liệu → 1 nguồn duy nhất, tự cập nhật mỗi sáng
 
-> **In one sentence:** a retail chain sells through stores, Shopee, TikTok Shop and a website, and keeps stock in an ERP.
-> Each system exports data in its own format. This project pulls all of them into **one place, with one definition per metric,
-> checked for errors and refreshed every day without anyone touching it.**
+> **Tóm tắt một câu:** một chuỗi bán lẻ bán hàng qua cửa hàng, Shopee, TikTok Shop và website, quản lý tồn kho trên ERP.
+> Mỗi hệ thống xuất dữ liệu theo một kiểu riêng. Dự án này gom tất cả về **một nơi, mỗi chỉ số chỉ có một định nghĩa,
+> tự kiểm tra lỗi và tự làm mới mỗi ngày mà không cần ai chạy tay.**
 
-**Why I built it.** In every job, the first problem I see is the same one: several teams, several spreadsheets, several
-"revenue" numbers. My approach is always to **centralize the data in one place, define each metric once, and automate the
-refresh**, so people spend meetings on decisions instead of on reconciling numbers. This repository is a public,
-end-to-end version of how I do that (all data is simulated for the fictional brand *Lumière*; no employer data is used).
+**Vì sao tôi làm dự án này.** Ở công ty nào, vấn đề đầu tiên tôi gặp cũng giống nhau: nhiều phòng ban, nhiều file Excel,
+nhiều con số "doanh thu" khác nhau. Cách tôi luôn làm là **tập trung dữ liệu về một nguồn, định nghĩa mỗi chỉ số một lần
+và tự động hoá việc cập nhật**, để các cuộc họp dành cho việc ra quyết định thay vì ngồi đối chiếu số. Repo này là phiên bản
+công khai, làm trọn từ đầu đến cuối, của cách tôi làm việc đó (toàn bộ dữ liệu là giả lập cho thương hiệu hư cấu *Lumière*;
+không dùng dữ liệu của bất kỳ công ty nào).
 
-![Daily net revenue by channel](output/daily_net.svg)
+![Doanh thu thuần theo ngày, theo kênh](output/daily_net.svg)
 
 ---
 
-## 1. Live status (updated by the pipeline itself)
+## 1. Trạng thái hiện tại (do pipeline tự cập nhật)
 
-The block below is rewritten by the robot every morning at 06:00 (Vietnam time). If the date is recent, the automation is working.
+Khối bên dưới được robot ghi lại mỗi sáng lúc 06:00 (giờ Việt Nam). Nếu ngày chạy là ngày gần nhất, nghĩa là tự động hoá đang hoạt động.
 
 <!-- STATUS:START -->
-**Last run:** 2026-09-29T02:51:28+07:00 (Vietnam time) · **Data through:** 2026-09-28 · **Status:** ✅ success · **Checks:** 8/9 passed · **Runtime:** 2.6 s
+**Lần chạy gần nhất:** 29/09/2026 11:41 (giờ Việt Nam) · **Dữ liệu đến ngày:** 28/09/2026 · **Trạng thái:** ✅ thành công · **Kiểm tra:** đạt 8/9 · **Thời gian chạy:** 10.6 giây
 
-| Last 30 days | Value |
+| 30 ngày gần nhất | Giá trị |
 |---|---|
-| Net revenue | 9,218,641,600 VND |
-| vs previous 30 days | +5.7% |
-| Orders | 20,310 |
-| Average order value | 453,897 VND |
-| Channel mix | pos 46% · shopee 25% · tiktok 19% · web 10% |
+| Doanh thu thuần | 9,218,641,600 đ |
+| So với 30 ngày trước đó | +5.7% |
+| Số đơn hàng | 20,310 |
+| Giá trị trung bình mỗi đơn | 453,897 đ |
+| Tỷ trọng theo kênh | Cửa hàng 46% · Shopee 25% · TikTok 19% · Website 10% |
 
-| Quality check | Result | Detail |
+| Phép kiểm tra | Kết quả | Chi tiết |
 |---|---|---|
-| `freshness_pos` | ✅ | partition 2026-09-28 found |
-| `freshness_shopee` | ✅ | partition 2026-09-28 found |
-| `freshness_tiktok` | ✅ | partition 2026-09-28 found |
-| `freshness_web` | ✅ | partition 2026-09-28 found |
-| `freshness_erp` | ✅ | partition 2026-09-28 found |
-| `valid_quantity` | ✅ | 0 rows with qty <= 0 |
-| `sku_mapping` | ⚠️ | 21 rows (0.04% of revenue) unmapped: tiktok:lum_live_combo_09 |
-| `reconciliation` | ✅ | worst daily gap 0.000% vs source reports; 0 day(s) over 0.5% |
-| `inventory_complete` | ✅ | 325/325 location-SKU rows |
+| `freshness_pos` | ✅ | phân vùng 28/09/2026 đã có |
+| `freshness_shopee` | ✅ | phân vùng 28/09/2026 đã có |
+| `freshness_tiktok` | ✅ | phân vùng 28/09/2026 đã có |
+| `freshness_web` | ✅ | phân vùng 28/09/2026 đã có |
+| `freshness_erp` | ✅ | phân vùng 28/09/2026 đã có |
+| `valid_quantity` | ✅ | 0 dòng có số lượng <= 0 |
+| `sku_mapping` | ⚠️ | 21 dòng (0.04% doanh thu) chưa map mã: tiktok:lum_live_combo_09 |
+| `reconciliation` | ✅ | lệch lớn nhất trong ngày 0.000% so với báo cáo nguồn; 0 ngày vượt 0.5% |
+| `inventory_complete` | ✅ | 325/325 dòng địa điểm-SKU |
 
-Low stock (under 14 days of cover): Lumière Sleeping Mask (13.9 d), Lumière Night Cream (6.2 d), Lumière Water Gel (10.5 d), Lumière Green Tea Clay (13.9 d), Lumière Calming Mist (10.1 d)
+Sắp hết hàng (đủ bán dưới 14 ngày): Lumière Sleeping Mask (13.9 ngày), Lumière Night Cream (6.2 ngày), Lumière Water Gel (10.5 ngày), Lumière Green Tea Clay (13.9 ngày), Lumière Calming Mist (10.1 ngày)
 <!-- STATUS:END -->
 
 ---
 
-## 2. The problem this solves
+## 2. Bài toán được giải quyết
 
-| Before (typical situation) | After (this hub) |
+| Trước đây (tình huống thường gặp) | Sau khi có hub |
 |---|---|
-| 5 systems, 5 export formats, copied into Excel by hand | One scheduled pipeline pulls all 5 every morning |
-| "Revenue" means something different in each team's file | **One** definition of net revenue, written once in SQL |
-| The same product has 5 different codes | One **master SKU** that every channel code maps to |
-| Errors are found at month-end, if ever | Automatic **quality gate** every day; bad data is never published |
-| Reports run on whatever data someone refreshed last | Reports read one set of report-ready tables (marts) |
+| 5 hệ thống, 5 kiểu file xuất, copy tay vào Excel | Một pipeline chạy theo lịch, tự lấy cả 5 nguồn mỗi sáng |
+| Mỗi phòng hiểu "doanh thu" một kiểu | **Một** định nghĩa doanh thu thuần, viết một lần bằng SQL |
+| Cùng một sản phẩm có 5 mã khác nhau | Một **mã SKU chuẩn (master SKU)**, mọi mã của từng kênh đều quy về mã này |
+| Lỗi dữ liệu chỉ phát hiện lúc chốt tháng, hoặc không bao giờ | **Cổng kiểm tra chất lượng** chạy tự động mỗi ngày; dữ liệu lỗi không bao giờ được công bố |
+| Báo cáo chạy trên dữ liệu ai đó làm mới gần nhất | Mọi báo cáo đọc chung một bộ bảng đã sẵn sàng (marts) |
 
 ---
 
-## 3. How it works
+## 3. Cách hoạt động
 
 ```mermaid
 flowchart LR
-    subgraph S[Source systems]
-        A[POS stores<br/>dd/mm/yyyy, local codes]
-        B[Shopee<br/>epoch UTC, duplicates]
-        C[TikTok Shop<br/>ISO UTC, mixed-case SKU]
-        D[Website<br/>+07:00, barcode as SKU]
-        E[ERP<br/>daily stock snapshot]
+    subgraph S[Hệ thống nguồn]
+        A[POS cửa hàng<br/>dd/mm/yyyy, mã nội bộ]
+        B[Shopee<br/>epoch UTC, dòng trùng]
+        C[TikTok Shop<br/>ISO UTC, SKU lẫn hoa thường]
+        D[Website<br/>+07:00, barcode làm SKU]
+        E[ERP<br/>ảnh chụp tồn kho cuối ngày]
     end
-    S -->|1. Extract<br/>only new days| L[(Lake<br/>raw, partitioned by day)]
-    L -->|2. Staging SQL<br/>one shared shape| F[fct_sales<br/>fct_inventory]
-    M[Master data<br/>SKU + store] --> F
-    F -->|3. Quality gate| Q{All checks pass?}
-    Q -- yes --> P[4. Marts + JSON + chart<br/>+ this README]
-    Q -- no --> X[Keep yesterday's numbers<br/>and flag the run as failed]
+    S -->|1. Extract<br/>chỉ lấy ngày mới| L[(Lake<br/>dữ liệu thô, chia theo ngày)]
+    L -->|2. Staging SQL<br/>đưa về một cấu trúc chung| F[fct_sales<br/>fct_inventory]
+    M[Master data<br/>SKU + cửa hàng] --> F
+    F -->|3. Kiểm tra chất lượng| Q{Đạt hết?}
+    Q -- đạt --> P[4. Marts + JSON + biểu đồ<br/>+ cập nhật README này]
+    Q -- không đạt --> X[Giữ số của hôm qua<br/>và đánh dấu lần chạy thất bại]
 ```
 
-| Step | What happens | File |
+| Bước | Việc được làm | File |
 |---|---|---|
-| **1. Extract** | Pulls only the days not loaded yet (a *watermark* remembers the last day per source) and stores them raw, one folder per day | `pipeline/run.py` → `extract()` |
-| **2. Transform** | Converts every source into one shared shape: Vietnam time, master SKU, one net-revenue rule, cancelled orders flagged | `sql/staging.sql` |
-| **3. Quality gate** | 9 automatic checks (below). Any failure stops publishing | `pipeline/run.py` → `quality()` |
-| **4. Publish** | Builds report-ready tables and writes JSON, the chart and the status block above | `sql/marts.sql`, `publish()` |
-| **Schedule** | GitHub Actions runs it daily at 06:00 and commits the results | `.github/workflows/retail-data-hub.yml` |
+| **1. Extract** | Chỉ lấy những ngày chưa nạp (*watermark* ghi nhớ ngày cuối cùng đã nạp của từng nguồn), lưu dữ liệu thô, mỗi ngày một thư mục | `pipeline/run.py` → `extract()` |
+| **2. Transform** | Đưa mọi nguồn về một cấu trúc chung: giờ Việt Nam, mã SKU chuẩn, một công thức doanh thu thuần, đánh dấu đơn huỷ | `sql/staging.sql` |
+| **3. Kiểm tra chất lượng** | 9 phép kiểm tra tự động (bên dưới). Chỉ cần một lỗi là dừng công bố | `pipeline/run.py` → `quality()` |
+| **4. Publish** | Tạo các bảng sẵn sàng cho báo cáo, xuất JSON, biểu đồ và khối trạng thái ở trên | `sql/marts.sql`, `publish()` |
+| **Lịch chạy** | GitHub Actions chạy mỗi ngày lúc 06:00 và tự commit kết quả | `.github/workflows/retail-data-hub.yml` |
 
 ---
 
-## 4. One source of truth: the rules written once
+## 4. Một nguồn sự thật: quy tắc chỉ viết một lần
 
-| Question | Rule (applied to every channel) |
+| Câu hỏi | Quy tắc (áp dụng cho mọi kênh) |
 |---|---|
-| Which day does an order belong to? | Vietnam local time (UTC+7), whatever time zone the source uses |
-| Which product is it? | Channel code → `master_sku` through `master/sku_master.csv` |
-| What is net revenue? | List price × quantity − seller-funded discount (platform-funded vouchers excluded) |
-| Do cancelled orders count? | No. They are kept for audit (`is_valid = false`) but excluded from every report |
-| Duplicate rows from an API? | Removed in staging, so they can never inflate revenue |
+| Đơn hàng thuộc ngày nào? | Theo giờ Việt Nam (UTC+7), bất kể nguồn dùng múi giờ nào |
+| Đây là sản phẩm nào? | Mã của từng kênh → `master_sku` qua file `master/sku_master.csv` |
+| Doanh thu thuần là gì? | Giá niêm yết × số lượng − giảm giá do shop chịu (không trừ voucher do sàn tài trợ) |
+| Đơn huỷ có tính không? | Không. Vẫn giữ lại để đối soát (`is_valid = false`) nhưng loại khỏi mọi báo cáo |
+| API trả về dòng trùng? | Loại bỏ ngay ở bước staging, nên không bao giờ làm phồng doanh thu |
 
-Because these rules live in one SQL file, **changing a definition changes it everywhere at once**.
+Vì các quy tắc này nằm trong một file SQL, **đổi định nghĩa một lần là mọi báo cáo đổi theo**.
 
 ---
 
-## 5. Automatic quality checks
+## 5. Kiểm tra chất lượng tự động
 
-| Check | What it protects against | If it fails |
+| Phép kiểm tra | Bảo vệ khỏi điều gì | Nếu không đạt |
 |---|---|---|
-| `freshness_*` (×5) | A source silently stopped sending data | Run fails |
-| `valid_quantity` | Zero or negative quantities | Run fails |
-| `sku_mapping` | New product codes missing from master data | Warning; fails if > 1% of revenue |
-| `reconciliation` | Hub total drifting from each system's own daily report (> 0.5%) | Run fails |
-| `inventory_complete` | Missing stock rows for a store or product | Run fails |
+| `freshness_*` (×5) | Một nguồn âm thầm ngừng gửi dữ liệu | Lần chạy thất bại |
+| `valid_quantity` | Số lượng bằng 0 hoặc âm | Lần chạy thất bại |
+| `sku_mapping` | Mã sản phẩm mới chưa có trong master data | Cảnh báo; thất bại nếu chiếm > 1% doanh thu |
+| `reconciliation` | Tổng của hub lệch với báo cáo ngày của từng hệ thống (> 0.5%) | Lần chạy thất bại |
+| `inventory_complete` | Thiếu dòng tồn kho của một cửa hàng hoặc sản phẩm | Lần chạy thất bại |
 
-The sample data contains real-world traps on purpose: Shopee duplicates, TikTok SKUs in mixed case, a livestream combo
-code that is not in master data yet. The checks catch each of them, and the status block shows what was found.
-
----
-
-## 6. Built to stay fast and cheap
-
-- **Incremental loads:** each run reads only new days, not the full history.
-- **Idempotent:** re-running the same day produces the same result; nothing is double-counted.
-- **Partition pruning:** reports read only the last 90 daily partitions (the run log records files read vs. files in the lake).
-- **Retention:** raw data older than 120 days is removed automatically, so storage stays flat.
-- **Ready for BigQuery:** `sql/bigquery_ddl.sql` shows the production table, partitioned by day and clustered by
-  channel/store/SKU, with a mandatory partition filter so no query can scan all history by accident.
+Dữ liệu mẫu cố ý chứa các "bẫy" thường gặp ngoài thực tế: dòng trùng từ Shopee, SKU TikTok lẫn chữ hoa chữ thường, một mã
+combo livestream chưa có trong master data. Các phép kiểm tra bắt được từng lỗi, và khối trạng thái hiển thị những gì tìm thấy.
 
 ---
 
-## 7. Repository layout
+## 6. Thiết kế để luôn nhanh và rẻ
+
+- **Nạp tăng dần (incremental):** mỗi lần chạy chỉ đọc ngày mới, không đọc lại toàn bộ lịch sử.
+- **Chạy lại an toàn (idempotent):** chạy lại cùng một ngày cho ra cùng một kết quả; không bị cộng trùng.
+- **Chỉ đọc phân vùng cần thiết (partition pruning):** báo cáo chỉ đọc 90 phân vùng ngày gần nhất (log ghi lại số file đã đọc so với tổng số file trong lake).
+- **Tự dọn dữ liệu cũ (retention):** dữ liệu thô cũ hơn 120 ngày được xoá tự động, dung lượng không phình ra.
+- **Sẵn sàng cho BigQuery:** `sql/bigquery_ddl.sql` mô tả bảng production, chia phân vùng theo ngày, cluster theo
+  kênh/cửa hàng/SKU, bắt buộc có điều kiện lọc phân vùng để không truy vấn nào lỡ quét toàn bộ lịch sử.
+
+---
+
+## 7. Cấu trúc thư mục
 
 ```
 0. [Python] Retail Data Hub/
 ├── pipeline/
-│   ├── sources.py      simulated source systems (5 formats, deterministic)
-│   └── run.py          extract → transform → quality gate → publish
+│   ├── sources.py      giả lập các hệ thống nguồn (5 định dạng, kết quả cố định)
+│   └── run.py          extract → transform → kiểm tra chất lượng → publish
 ├── sql/
-│   ├── staging.sql     the single definitions (one shared shape)
-│   ├── marts.sql       report-ready tables
-│   └── bigquery_ddl.sql production table design
+│   ├── staging.sql     nơi duy nhất chứa các định nghĩa (một cấu trúc chung)
+│   ├── marts.sql       các bảng sẵn sàng cho báo cáo
+│   └── bigquery_ddl.sql thiết kế bảng production
 ├── master/             sku_master.csv, store_master.csv (master data)
-├── lake/               raw data, one folder per source per day (written by the pipeline)
-├── state/              watermark: last day loaded per source
-└── output/             summary, SKU, store, daily JSON + chart + run log
+├── lake/               dữ liệu thô, mỗi nguồn mỗi ngày một thư mục (do pipeline ghi)
+├── state/              watermark: ngày cuối cùng đã nạp của từng nguồn
+└── output/             JSON tổng hợp, theo SKU, cửa hàng, theo ngày + biểu đồ + log chạy
 ```
 
 ---
 
-## 8. Run it yourself
+## 8. Tự chạy thử
 
 ```bash
 pip install -r requirements.txt
-python pipeline/run.py            # daily run: loads only new days
-python pipeline/run.py --rebuild  # start over: backfill 120 days
+python pipeline/run.py            # chạy hằng ngày: chỉ nạp ngày mới
+python pipeline/run.py --rebuild  # làm lại từ đầu: nạp lại 120 ngày
 ```
 
-Takes about 3 seconds on a laptop. Output lands in `output/`.
+Chạy khoảng 3 giây trên laptop. Kết quả nằm trong thư mục `output/`.
 
 ---
 
-## 9. Tech stack
+## 9. Công nghệ sử dụng
 
-Python · SQL (DuckDB locally, BigQuery design for production) · GitHub Actions (scheduling) · Git (versioned data and logic)
-
----
-
-## Tóm tắt tiếng Việt
-
-Dự án mô phỏng việc **gom dữ liệu từ 5 hệ thống** (cửa hàng, Shopee, TikTok Shop, website, ERP tồn kho) **về một nguồn duy nhất**,
-thống nhất **một định nghĩa** cho mỗi chỉ số, **tự kiểm tra lỗi** và **tự chạy mỗi sáng** bằng GitHub Actions.
-Đây là bản công khai, dùng dữ liệu giả lập, của cách tôi làm việc với dữ liệu: tập trung một nguồn, tự động hoá và tối ưu để báo cáo luôn đúng và nhất quán.
+Python · SQL (DuckDB khi chạy local, thiết kế cho BigQuery khi lên production) · GitHub Actions (lập lịch) · Git (quản lý phiên bản dữ liệu và logic)

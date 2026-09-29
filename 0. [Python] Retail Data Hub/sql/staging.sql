@@ -1,13 +1,13 @@
--- STAGING: one view per source, translated into ONE shared shape.
--- Rules applied here (the single definition every report inherits):
---   * time            -> Vietnam local time (UTC+7)
---   * product code    -> master_sku via sku_master (unknown codes stay NULL and are flagged)
---   * net revenue     -> list price x qty - seller-funded discount (platform-funded discount excluded)
---   * cancelled/voided orders -> is_valid = false (kept for audit, excluded from marts)
--- {start} / {end} limit the partitions read (partition pruning).
+-- STAGING: mỗi nguồn một view, tất cả được đưa về MỘT cấu trúc chung.
+-- Các quy tắc áp dụng tại đây (định nghĩa duy nhất mà mọi báo cáo kế thừa):
+--   * thời gian       -> giờ Việt Nam (UTC+7)
+--   * mã sản phẩm     -> master_sku qua sku_master (mã lạ để NULL và bị gắn cờ)
+--   * doanh thu thuần -> giá niêm yết x số lượng - giảm giá do shop chịu (không trừ giảm giá do sàn tài trợ)
+--   * đơn huỷ/void    -> is_valid = false (giữ lại để đối soát, loại khỏi marts)
+-- {start} / {end} giới hạn các phân vùng được đọc (partition pruning).
 
 CREATE OR REPLACE TABLE sku_master AS SELECT * FROM read_csv('{hub}/master/sku_master.csv', all_varchar = true);
--- master data: every channel's product code points to ONE master_sku
+-- master data: mã sản phẩm của mọi kênh đều trỏ về MỘT master_sku
 CREATE OR REPLACE TABLE sku_map AS
           SELECT 'pos'    AS channel, pos_code   AS source_sku, master_sku FROM sku_master
 UNION ALL SELECT 'shopee', shopee_sku, master_sku FROM sku_master
@@ -46,7 +46,7 @@ SELECT 'web' AS channel, id AS order_id, 'ONLINE' AS store_code,
 FROM read_csv('{hub}/lake/web/*/*.csv', hive_partitioning = true, all_varchar = true)
 WHERE dt BETWEEN '{start}' AND '{end}';
 
--- one fact table for every channel
+-- một bảng fact chung cho mọi kênh
 CREATE OR REPLACE TABLE fct_sales AS
 WITH unioned AS (
     SELECT * FROM stg_pos UNION ALL SELECT * FROM stg_shopee

@@ -1,12 +1,12 @@
-"""Retail Data Hub - daily pipeline.
+"""Retail Data Hub - pipeline chạy hằng ngày.
 
-    extract (incremental)  ->  lake/ (raw, partitioned by day)
-    transform (SQL)        ->  staging views -> fct_sales / fct_inventory -> marts
-    quality gate           ->  stop publishing if any check fails
-    publish                ->  output/*.json, output/daily_net.svg, README status block
+    extract (tăng dần)      ->  lake/ (dữ liệu thô, chia phân vùng theo ngày)
+    transform (SQL)         ->  staging views -> fct_sales / fct_inventory -> marts
+    kiểm tra chất lượng     ->  dừng công bố nếu có phép kiểm tra không đạt
+    publish                 ->  output/*.json, output/daily_net.svg, khối trạng thái trong README
 
-Run:  python pipeline/run.py            (normal daily run)
-      python pipeline/run.py --rebuild  (drop the lake and backfill from scratch)
+Chạy: python pipeline/run.py            (chạy hằng ngày)
+      python pipeline/run.py --rebuild  (xoá lake và nạp lại từ đầu)
 """
 from __future__ import annotations
 
@@ -29,9 +29,9 @@ from sources import SOURCES, control_total  # noqa: E402
 HUB = Path(__file__).resolve().parents[1]
 LAKE, OUT, STATE = HUB / "lake", HUB / "output", HUB / "state" / "watermark.json"
 VN = timezone(timedelta(hours=7))
-BACKFILL_DAYS = 120          # first run loads this much history
-RETENTION_DAYS = 120         # raw partitions older than this are removed
-RECON_TOLERANCE = 0.005      # hub vs source daily total may differ by at most 0.5%
+BACKFILL_DAYS = 120          # lần chạy đầu nạp ngần này ngày lịch sử
+RETENTION_DAYS = 120         # phân vùng thô cũ hơn mốc này bị xoá
+RECON_TOLERANCE = 0.005      # tổng ngày của hub và nguồn chỉ được lệch tối đa 0.5%
 
 
 def today_vn() -> date:
@@ -45,7 +45,7 @@ def extract(end: date) -> dict:
     for name, fetch in SOURCES.items():
         last = date.fromisoformat(state[name]) if name in state else end - timedelta(days=BACKFILL_DAYS)
         days, d = [], last + timedelta(days=1)
-        while d <= end:                                   # only days not loaded yet
+        while d <= end:                                   # chỉ lấy ngày chưa nạp
             rows = fetch(d)
             part = LAKE / name / f"dt={d.isoformat()}"
             part.mkdir(parents=True, exist_ok=True)
@@ -84,35 +84,35 @@ def run_sql(con, file: str, **params):
     con.execute(sql)
 
 
-# ------------------------------------------------------------------ 3. QUALITY GATE
+# ------------------------------------------------------------------ 3. KIỂM TRA CHẤT LƯỢNG
 def quality(con, start: date, end: date) -> list[dict]:
     checks = []
 
     def add(name, ok, detail, severity="fail"):
         checks.append({"check": name, "status": "pass" if ok else severity, "detail": detail})
 
-    # freshness: every source delivered yesterday's data
+    # độ mới: nguồn nào cũng đã gửi dữ liệu của hôm qua
     for s in SOURCES:
         ok = (LAKE / s / f"dt={end.isoformat()}" / "data.csv").exists()
-        add(f"freshness_{s}", ok, f"partition {end} {'found' if ok else 'missing'}")
+        add(f"freshness_{s}", ok, f"phân vùng {end:%d/%m/%Y} {'đã có' if ok else 'bị thiếu'}")
 
-    # no zero / negative quantities
+    # không có số lượng bằng 0 hoặc âm
     bad = con.sql("SELECT count(*) FROM fct_sales WHERE qty <= 0").fetchone()[0]
-    add("valid_quantity", bad == 0, f"{bad} rows with qty <= 0")
+    add("valid_quantity", bad == 0, f"{bad} dòng có số lượng <= 0")
 
-    # unmapped product codes: warn if any, fail if they carry > 1% of revenue
+    # mã sản phẩm chưa map: cảnh báo nếu có, thất bại nếu chiếm > 1% doanh thu
     unm = con.sql("""SELECT count(*), coalesce(sum(net),0),
                             (SELECT sum(net) FROM fct_sales WHERE is_valid),
                             string_agg(DISTINCT channel || ':' || source_sku, ', ')
                      FROM fct_sales WHERE is_valid AND master_sku IS NULL""").fetchone()
     share = (unm[1] / unm[2]) if unm[2] else 0
     add("sku_mapping", share <= 0.01,
-        f"{unm[0]} rows ({share:.2%} of revenue) unmapped" + (f": {unm[3]}" if unm[0] else ""),
+        f"{unm[0]} dòng ({share:.2%} doanh thu) chưa map mã" + (f": {unm[3]}" if unm[0] else ""),
         severity="warn" if share <= 0.01 else "fail")
     if unm[0] and share <= 0.01:
         checks[-1]["status"] = "warn"
 
-    # reconciliation: hub net (mapped + unmapped) = each system's own daily report
+    # đối soát: doanh thu thuần của hub (đã map + chưa map) = báo cáo ngày của từng hệ thống
     hub = {(r[0], str(r[1])): r[2] for r in con.sql(
         "SELECT channel, dt, sum(net) FROM fct_sales WHERE is_valid GROUP BY ALL").fetchall()}
     worst, fails = 0.0, 0
@@ -125,20 +125,20 @@ def quality(con, start: date, end: date) -> list[dict]:
         diff = abs(h - ctl["net_revenue"]) / ctl["net_revenue"] if ctl["net_revenue"] else 0
         worst = max(worst, diff)
         fails += diff > RECON_TOLERANCE
-    add("reconciliation", fails == 0, f"worst daily gap {worst:.3%} vs source reports; {fails} day(s) over {RECON_TOLERANCE:.1%}")
+    add("reconciliation", fails == 0, f"lệch lớn nhất trong ngày {worst:.3%} so với báo cáo nguồn; {fails} ngày vượt {RECON_TOLERANCE:.1%}")
 
-    # inventory snapshot complete: every location x active sku
+    # tồn kho đủ dòng: mọi địa điểm x mọi SKU đang bán
     got, exp = con.sql("""SELECT count(*), (SELECT count(DISTINCT location) FROM fct_inventory) *
                           (SELECT count(*) FROM sku_master WHERE launch_date::DATE <= DATE '{e}')
                           FROM fct_inventory""".replace("{e}", end.isoformat())).fetchone()
-    add("inventory_complete", got == exp, f"{got}/{exp} location-SKU rows")
+    add("inventory_complete", got == exp, f"{got}/{exp} dòng địa điểm-SKU")
     return checks
 
 
 # ------------------------------------------------------------------ 4. PUBLISH
 def svg_daily(rows: list[tuple]) -> str:
-    """Small stacked-area chart of daily net revenue by channel, embedded in the README."""
-    chans = [("pos", "#2563eb", "Stores"), ("shopee", "#f97316", "Shopee"), ("tiktok", "#111827", "TikTok"), ("web", "#10b981", "Website")]
+    """Biểu đồ vùng xếp chồng: doanh thu thuần theo ngày, theo kênh, nhúng vào README."""
+    chans = [("pos", "#2563eb", "Cửa hàng"), ("shopee", "#f97316", "Shopee"), ("tiktok", "#111827", "TikTok"), ("web", "#10b981", "Website")]
     days = sorted({r[0] for r in rows})
     val = {(str(r[0]), r[1]): r[2] for r in rows}
     W, H, L, B, T = 760, 240, 56, 28, 16
@@ -192,7 +192,7 @@ def publish(con, end: date, checks, loaded, removed, seconds, files_read, files_
     runs = (runs + [run])[-60:]
     runs_file.write_text(json.dumps(runs, indent=1, default=str), encoding="utf-8")
     (OUT / "quality.json").write_text(json.dumps(checks, indent=1, ensure_ascii=False), encoding="utf-8")
-    if status == "failed":                       # quality gate: keep last good numbers
+    if status == "failed":                       # không đạt kiểm tra: giữ số đúng gần nhất
         return run
 
     dump = lambda name, obj: (OUT / name).write_text(json.dumps(obj, indent=1, default=str, ensure_ascii=False), encoding="utf-8")
@@ -211,23 +211,26 @@ def update_readme(run, kpi, mix, checks, sku):
         return
     icon = {"pass": "✅", "warn": "⚠️", "fail": "❌"}
     low = [s for s in sku if s["days_cover"] is not None and s["days_cover"] < 14][:5]
+    kenh = {"pos": "Cửa hàng", "shopee": "Shopee", "tiktok": "TikTok", "web": "Website"}
+    run_at = datetime.fromisoformat(run["run_at"]).strftime("%d/%m/%Y %H:%M")
+    thru = date.fromisoformat(run["data_through"]).strftime("%d/%m/%Y")
     lines = [
         "<!-- STATUS:START -->",
-        f"**Last run:** {run['run_at']} (Vietnam time) · **Data through:** {run['data_through']} · "
-        f"**Status:** {'✅ success' if run['status'] == 'success' else '❌ failed'} · "
-        f"**Checks:** {run['checks_passed']}/{run['checks_total']} passed · **Runtime:** {run['seconds']} s",
+        f"**Lần chạy gần nhất:** {run_at} (giờ Việt Nam) · **Dữ liệu đến ngày:** {thru} · "
+        f"**Trạng thái:** {'✅ thành công' if run['status'] == 'success' else '❌ thất bại'} · "
+        f"**Kiểm tra:** đạt {run['checks_passed']}/{run['checks_total']} · **Thời gian chạy:** {run['seconds']} giây",
         "",
-        "| Last 30 days | Value |", "|---|---|",
-        f"| Net revenue | {kpi['net_30d']:,.0f} VND |",
-        f"| vs previous 30 days | {kpi['growth']:+.1%} |" if kpi["growth"] is not None else "| vs previous 30 days | n/a |",
-        f"| Orders | {kpi['orders_30d']:,} |",
-        f"| Average order value | {kpi['aov_30d']:,} VND |",
-        "| Channel mix | " + " · ".join(f"{m['channel']} {m['net'] / kpi['net_30d']:.0%}" for m in mix) + " |",
+        "| 30 ngày gần nhất | Giá trị |", "|---|---|",
+        f"| Doanh thu thuần | {kpi['net_30d']:,.0f} đ |",
+        f"| So với 30 ngày trước đó | {kpi['growth']:+.1%} |" if kpi["growth"] is not None else "| So với 30 ngày trước đó | chưa có |",
+        f"| Số đơn hàng | {kpi['orders_30d']:,} |",
+        f"| Giá trị trung bình mỗi đơn | {kpi['aov_30d']:,} đ |",
+        "| Tỷ trọng theo kênh | " + " · ".join(f"{kenh.get(m['channel'], m['channel'])} {m['net'] / kpi['net_30d']:.0%}" for m in mix) + " |",
         "",
-        "| Quality check | Result | Detail |", "|---|---|---|",
+        "| Phép kiểm tra | Kết quả | Chi tiết |", "|---|---|---|",
         *[f"| `{c['check']}` | {icon[c['status']]} | {c['detail']} |" for c in checks],
         "",
-        "Low stock (under 14 days of cover): " + (", ".join(f"{s['product_name']} ({s['days_cover']} d)" for s in low) or "none"),
+        "Sắp hết hàng (đủ bán dưới 14 ngày): " + (", ".join(f"{s['product_name']} ({s['days_cover']} ngày)" for s in low) or "không có"),
         "<!-- STATUS:END -->",
     ]
     txt = readme.read_text(encoding="utf-8")
@@ -238,20 +241,20 @@ def update_readme(run, kpi, mix, checks, sku):
 # ------------------------------------------------------------------ main
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--rebuild", action="store_true", help="delete lake and state, backfill again")
+    ap.add_argument("--rebuild", action="store_true", help="xoá lake và state, nạp lại từ đầu")
     args = ap.parse_args()
     t0 = time.time()
     if args.rebuild:
         shutil.rmtree(LAKE, ignore_errors=True)
         STATE.unlink(missing_ok=True)
-    end = today_vn() - timedelta(days=1)           # yesterday is the last complete day
+    end = today_vn() - timedelta(days=1)           # hôm qua là ngày cuối cùng đã đủ dữ liệu
     loaded = extract(end)
     removed = prune(end)
-    start = end - timedelta(days=90)               # marts only need 90 days -> read only those partitions
+    start = end - timedelta(days=90)               # marts chỉ cần 90 ngày -> chỉ đọc các phân vùng đó
     files_total = sum(1 for _ in LAKE.glob("*/dt=*/data.csv"))
     files_read = sum(1 for p in LAKE.glob("*/dt=*/data.csv") if start.isoformat() <= p.parent.name[3:] <= end.isoformat())
 
-    os.chdir(HUB)                                  # relative paths: folder names like "[Python]" would break glob patterns
+    os.chdir(HUB)                                  # dùng đường dẫn tương đối: tên thư mục có "[Python]" làm hỏng mẫu glob
     con = duckdb.connect()
     run_sql(con, "staging.sql", hub=".", start=start, end=end)
     run_sql(con, "marts.sql", end=end)

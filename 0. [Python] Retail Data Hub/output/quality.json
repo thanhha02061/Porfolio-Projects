@@ -2,46 +2,46 @@
  {
   "check": "freshness_pos",
   "status": "pass",
-  "detail": "partition 2026-09-28 found"
+  "detail": "phân vùng 28/09/2026 đã có"
  },
  {
   "check": "freshness_shopee",
   "status": "pass",
-  "detail": "partition 2026-09-28 found"
+  "detail": "phân vùng 28/09/2026 đã có"
  },
  {
   "check": "freshness_tiktok",
   "status": "pass",
-  "detail": "partition 2026-09-28 found"
+  "detail": "phân vùng 28/09/2026 đã có"
  },
  {
   "check": "freshness_web",
   "status": "pass",
-  "detail": "partition 2026-09-28 found"
+  "detail": "phân vùng 28/09/2026 đã có"
  },
  {
   "check": "freshness_erp",
   "status": "pass",
-  "detail": "partition 2026-09-28 found"
+  "detail": "phân vùng 28/09/2026 đã có"
  },
  {
   "check": "valid_quantity",
   "status": "pass",
-  "detail": "0 rows with qty <= 0"
+  "detail": "0 dòng có số lượng <= 0"
  },
  {
   "check": "sku_mapping",
   "status": "warn",
-  "detail": "21 rows (0.04% of revenue) unmapped: tiktok:lum_live_combo_09"
+  "detail": "21 dòng (0.04% doanh thu) chưa map mã: tiktok:lum_live_combo_09"
  },
  {
   "check": "reconciliation",
   "status": "pass",
-  "detail": "worst daily gap 0.000% vs source reports; 0 day(s) over 0.5%"
+  "detail": "lệch lớn nhất trong ngày 0.000% so với báo cáo nguồn; 0 ngày vượt 0.5%"
  },
  {
   "check": "inventory_complete",
   "status": "pass",
-  "detail": "325/325 location-SKU rows"
+  "detail": "325/325 dòng địa điểm-SKU"
  }
 ]

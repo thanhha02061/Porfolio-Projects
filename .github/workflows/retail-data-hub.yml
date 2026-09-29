@@ -1,10 +1,10 @@
-# Runs the Retail Data Hub pipeline every morning and commits the refreshed data.
-name: Retail Data Hub - daily pipeline
+# Chạy pipeline Retail Data Hub mỗi sáng và commit dữ liệu vừa làm mới.
+name: Retail Data Hub - pipeline hằng ngày
 
 on:
   schedule:
-    - cron: "0 23 * * *"      # 06:00 Vietnam time
-  workflow_dispatch:           # "Run workflow" button for a manual run
+    - cron: "0 23 * * *"      # 06:00 giờ Việt Nam
+  workflow_dispatch:           # nút "Run workflow" để chạy tay
 
 permissions:
   contents: write
@@ -29,18 +29,18 @@ jobs:
           cache: pip
           cache-dependency-path: "${{ env.HUB_DIR }}/requirements.txt"
 
-      - name: Install dependencies
+      - name: Cài thư viện
         run: pip install -r "$HUB_DIR/requirements.txt"
 
-      - name: Extract, transform, check quality, publish
+      - name: Extract, transform, kiểm tra chất lượng, publish
         id: run
         run: python "$HUB_DIR/pipeline/run.py"
 
-      - name: Commit refreshed data (also on failure, so the run log is kept)
+      - name: Commit dữ liệu mới (kể cả khi thất bại, để giữ log chạy)
         if: always()
         run: |
           git config user.name  "retail-data-hub-bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A "$HUB_DIR/lake" "$HUB_DIR/state" "$HUB_DIR/output" "$HUB_DIR/README.md"
-          git diff --cached --quiet || git commit -m "data-hub: daily run $(date -u +%F)"
+          git diff --cached --quiet || git commit -m "data-hub: lần chạy hằng ngày $(date -u +%F)"
           git push

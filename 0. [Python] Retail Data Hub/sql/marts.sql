@@ -1,5 +1,5 @@
--- MARTS: small, report-ready tables built only from fct_sales / fct_inventory.
--- Every dashboard number comes from here, so every report shows the same number.
+-- MARTS: các bảng nhỏ, sẵn sàng cho báo cáo, chỉ dựng từ fct_sales / fct_inventory.
+-- Mọi con số trên dashboard đều lấy từ đây, nên báo cáo nào cũng ra cùng một số.
 
 CREATE OR REPLACE TABLE mart_daily_channel AS
 SELECT dt, channel,

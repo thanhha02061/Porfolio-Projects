@@ -1,6 +1,6 @@
--- Same fact table on BigQuery (production target).
--- Partition by day + cluster by the columns every report filters on,
--- so a "last 30 days, one channel" query scans ~30 partitions instead of the whole table.
+-- Cùng bảng fact nhưng trên BigQuery (môi trường production).
+-- Chia phân vùng theo ngày + cluster theo các cột mà báo cáo nào cũng lọc,
+-- nên truy vấn "30 ngày gần nhất, một kênh" chỉ quét ~30 phân vùng thay vì cả bảng.
 
 CREATE TABLE IF NOT EXISTS retail_hub.fct_sales (
   channel       STRING  NOT NULL,
@@ -20,10 +20,10 @@ CREATE TABLE IF NOT EXISTS retail_hub.fct_sales (
 )
 PARTITION BY dt
 CLUSTER BY channel, store_code, master_sku
-OPTIONS (require_partition_filter = TRUE,        -- nobody can accidentally scan all history
+OPTIONS (require_partition_filter = TRUE,        -- không ai lỡ tay quét toàn bộ lịch sử
          partition_expiration_days = 730);
 
--- Incremental load: replace only the days that were re-extracted (idempotent, safe to re-run)
+-- Nạp tăng dần: chỉ thay các ngày vừa lấy lại (idempotent, chạy lại an toàn)
 -- MERGE retail_hub.fct_sales T USING staging.fct_sales_new S
 --   ON T.dt = S.dt AND T.channel = S.channel AND T.order_id = S.order_id AND T.source_sku = S.source_sku
 -- WHEN MATCHED THEN UPDATE SET qty = S.qty, gross = S.gross, discount = S.discount, net = S.net, is_valid = S.is_valid

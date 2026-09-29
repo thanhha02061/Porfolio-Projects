@@ -1,12 +1,12 @@
-"""Simulated source systems.
+"""Giả lập các hệ thống nguồn.
 
-Each function returns what a real connector would receive from that system for one
-business day (Vietnam time): a list of rows in the system's *native* format plus the
-system's own daily total. The formats differ on purpose - date formats, time zones,
-SKU codes, discount fields - because that is exactly the mess a data hub has to absorb.
+Mỗi hàm trả về đúng thứ mà một connector thật nhận được từ hệ thống đó trong một ngày
+kinh doanh (giờ Việt Nam): danh sách dòng theo định dạng *gốc* của hệ thống, kèm tổng ngày
+do chính hệ thống báo cáo. Các định dạng cố ý khác nhau - kiểu ngày, múi giờ, mã SKU,
+trường giảm giá - vì đó chính là mớ hỗn độn mà một data hub phải xử lý.
 
-All data is fictional (brand "Lumière"). Output is deterministic: the same date always
-produces the same rows, so the pipeline can be re-run safely.
+Toàn bộ dữ liệu là hư cấu (thương hiệu "Lumière"). Kết quả cố định: cùng một ngày luôn
+sinh ra cùng các dòng, nên pipeline chạy lại bao nhiêu lần cũng an toàn.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ HUB = Path(__file__).resolve().parents[1]
 VN = timezone(timedelta(hours=7))
 
 CHANNEL_SHARE = {"pos": 0.45, "shopee": 0.25, "tiktok": 0.20, "web": 0.10}
-DAILY_UNITS = 900  # chain-wide units on a normal weekday
+DAILY_UNITS = 900  # số sản phẩm bán ra toàn chuỗi trong một ngày thường
 
 
 def _load(name: str) -> list[dict]:
@@ -38,13 +38,13 @@ def _rng(source: str, d: date) -> random.Random:
 
 
 def _demand_factor(d: date, online: bool) -> float:
-    f = 1.0 + 0.0012 * (d - date(2026, 1, 1)).days          # slow growth
+    f = 1.0 + 0.0012 * (d - date(2026, 1, 1)).days          # tăng trưởng chậm
     if d.weekday() >= 5:
-        f *= 1.18                                          # weekend
+        f *= 1.18                                          # cuối tuần
     if d.day >= 25 or d.day <= 3:
-        f *= 1.08                                          # payday window
+        f *= 1.08                                          # quanh kỳ nhận lương
     if online and d.day == d.month:
-        f *= 2.6                                           # 9.9, 10.10, 11.11 mega sale
+        f *= 2.6                                           # ngày sale lớn 9.9, 10.10, 11.11
     return f
 
 
@@ -56,7 +56,7 @@ def _sku_weight(sku: dict, d: date) -> float:
 
 
 def _orders(source: str, d: date):
-    """Yield (order_no, [(sku, qty, unit_price, discount)]) for one channel and day."""
+    """Sinh (số đơn, [(sku, số lượng, đơn giá, giảm giá)]) cho một kênh trong một ngày."""
     r = _rng(source, d)
     online = source != "pos"
     units_target = DAILY_UNITS * CHANNEL_SHARE[source] * _demand_factor(d, online) * r.uniform(0.9, 1.1)
@@ -79,7 +79,7 @@ def _ts(d: date, r: random.Random) -> datetime:
     return datetime(d.year, d.month, d.day, tzinfo=VN) + timedelta(minutes=r.randint(8 * 60, 22 * 60))
 
 
-# ---------------------------------------------------------------- POS (KiotViet-style)
+# ---------------------------------------------------------------- POS (kiểu KiotViet)
 def pos_sales(d: date):
     r, rows = _rng("pos-ts", d), []
     for n, lines in _orders("pos", d):
@@ -91,7 +91,7 @@ def pos_sales(d: date):
     return rows
 
 
-# ---------------------------------------------------------------- Shopee (epoch UTC, cancellations, API page overlap)
+# ---------------------------------------------------------------- Shopee (epoch UTC, đơn huỷ, API trả trùng trang)
 def shopee_orders(d: date):
     r, rows = _rng("shopee-ts", d), []
     for n, lines in _orders("shopee", d):
@@ -101,12 +101,12 @@ def shopee_orders(d: date):
             rows.append({"order_sn": f"26{d:%m%d}SP{n:05d}", "create_time": int(ts.timestamp()),
                          "item_sku": sku["shopee_sku"], "quantity": qty, "original_price": price,
                          "seller_discount": int(disc), "order_status": status})
-    if rows and r.random() < 0.5:                  # API pagination returns a few rows twice
+    if rows and r.random() < 0.5:                  # phân trang API trả về vài dòng hai lần
         rows += rows[-3:]
     return rows
 
 
-# ---------------------------------------------------------------- TikTok Shop (ISO UTC, inconsistent SKU casing, bundles)
+# ---------------------------------------------------------------- TikTok Shop (ISO UTC, SKU lẫn hoa thường, combo)
 def tiktok_orders(d: date):
     r, rows = _rng("tiktok-ts", d), []
     for n, lines in _orders("tiktok", d):
@@ -119,14 +119,14 @@ def tiktok_orders(d: date):
             rows.append({"order_id": f"57{d:%m%d}{n:06d}", "created_at": ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
                          "seller_sku": code, "qty": qty, "sku_unit_original_price": price,
                          "seller_discount": int(disc), "platform_discount": int(platform), "order_status": status})
-    if r.random() < 0.25:                          # livestream bundle not yet in master data
+    if r.random() < 0.25:                          # combo livestream chưa có trong master data
         rows.append({"order_id": f"57{d:%m%d}999999", "created_at": _ts(d, r).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                      "seller_sku": "lum_live_combo_09", "qty": 1, "sku_unit_original_price": 499000,
                      "seller_discount": 50000, "platform_discount": 0, "order_status": "DELIVERED"})
     return rows
 
 
-# ---------------------------------------------------------------- Website (ISO +07:00, barcode as SKU)
+# ---------------------------------------------------------------- Website (ISO +07:00, barcode làm SKU)
 def web_orders(d: date):
     r, rows = _rng("web-ts", d), []
     for n, lines in _orders("web", d):
@@ -138,7 +138,7 @@ def web_orders(d: date):
     return rows
 
 
-# ---------------------------------------------------------------- ERP inventory snapshot (end of day)
+# ---------------------------------------------------------------- ERP: ảnh chụp tồn kho cuối ngày
 def erp_inventory(d: date):
     rows = []
     for loc in [s["store_code"] for s in STORES] + ["WH-ONLINE"]:
@@ -154,14 +154,14 @@ def erp_inventory(d: date):
     return rows
 
 
-# ---------------------------------------------------------------- each system's own daily report (for reconciliation)
+# ---------------------------------------------------------------- báo cáo ngày của chính từng hệ thống (dùng để đối soát)
 def control_total(source: str, rows: list[dict]) -> dict:
     if source == "pos":
         net = sum(x["SL"] * x["DonGia"] - x["GiamGia"] for x in rows)
     elif source == "shopee":
         seen, net = set(), 0
         for x in rows:
-            k = tuple(sorted(x.items()))  # the system's own report counts each unique line once
+            k = tuple(sorted(x.items()))  # báo cáo của hệ thống chỉ tính mỗi dòng duy nhất một lần
             if x["order_status"] == "COMPLETED" and k not in seen:
                 net += x["quantity"] * x["original_price"] - x["seller_discount"]
             seen.add(k)
