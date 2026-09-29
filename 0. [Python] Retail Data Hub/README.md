@@ -60,22 +60,7 @@ Sắp hết hàng (đủ bán dưới 14 ngày): Lumière Sleeping Mask (13.9 ng
 
 ## 3. Cách hoạt động
 
-```mermaid
-flowchart LR
-    subgraph S[Hệ thống nguồn]
-        A[POS cửa hàng<br/>dd/mm/yyyy, mã nội bộ]
-        B[Shopee<br/>epoch UTC, dòng trùng]
-        C[TikTok Shop<br/>ISO UTC, SKU lẫn hoa thường]
-        D[Website<br/>+07:00, barcode làm SKU]
-        E[ERP<br/>ảnh chụp tồn kho cuối ngày]
-    end
-    S -->|1. Extract<br/>chỉ lấy ngày mới| L[(Lake<br/>dữ liệu thô, chia theo ngày)]
-    L -->|2. Staging SQL<br/>đưa về một cấu trúc chung| F[fct_sales<br/>fct_inventory]
-    M[Master data<br/>SKU + cửa hàng] --> F
-    F -->|3. Kiểm tra chất lượng| Q{Đạt hết?}
-    Q -- đạt --> P[4. Marts + JSON + biểu đồ<br/>+ cập nhật README này]
-    Q -- không đạt --> X[Giữ số của hôm qua<br/>và đánh dấu lần chạy thất bại]
-```
+![Luồng dữ liệu của Retail Data Hub](docs/pipeline.svg)
 
 | Bước | Việc được làm | File |
 |---|---|---|
