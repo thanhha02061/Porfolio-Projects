@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+  </defs>
+  <rect width="1200" height="560" rx="18" fill="#ffffff"/>
+  <text x="30" y="42" font-size="22" font-weight="700" fill="#0f172a">Shopee Customer Behavior &amp; RFM: luồng tính toán</text>
+  <text x="30" y="66" font-size="14" fill="#64748b">Từ 3 bảng Shopee + danh mục sản phẩm → mỗi dòng sản phẩm được gắn nhãn hành vi khách</text>
+
+  <!-- sources -->
+  <rect x="24" y="90" width="220" height="440" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="134" y="116" font-size="14" font-weight="700" fill="#334155" text-anchor="middle">NGUỒN</text>
+  <g font-size="12">
+    <rect x="40" y="132" width="188" height="64" rx="10" fill="#fff7ed" stroke="#f97316"/><rect x="40" y="132" width="8" height="64" rx="4" fill="#f97316"/>
+    <text x="58" y="158" font-size="14" font-weight="700" fill="#9a3412">shopee_orderitems</text><text x="58" y="180" fill="#475569">dòng sản phẩm, giá, SKU</text>
+    <rect x="40" y="208" width="188" height="64" rx="10" fill="#fff7ed" stroke="#f97316"/><rect x="40" y="208" width="8" height="64" rx="4" fill="#f97316"/>
+    <text x="58" y="234" font-size="14" font-weight="700" fill="#9a3412">shopee_orders</text><text x="58" y="256" fill="#475569">ngày đặt, trạng thái</text>
+    <rect x="40" y="284" width="188" height="64" rx="10" fill="#fff7ed" stroke="#f97316"/><rect x="40" y="284" width="8" height="64" rx="4" fill="#f97316"/>
+    <text x="58" y="310" font-size="14" font-weight="700" fill="#9a3412">shopee_escrows</text><text x="58" y="332" fill="#475569">voucher shop, voucher sàn</text>
+    <rect x="40" y="412" width="188" height="64" rx="10" fill="#fce7f3" stroke="#db2777"/><rect x="40" y="412" width="8" height="64" rx="4" fill="#db2777"/>
+    <text x="58" y="438" font-size="14" font-weight="700" fill="#9d174d">dim_product</text><text x="58" y="460" fill="#475569">ngành hàng, thương hiệu</text>
+  </g>
+  <g stroke="#94a3b8" stroke-width="2" fill="none">
+    <path d="M228 164 C262 164 262 236 290 240"/><path d="M228 240 L290 244" marker-end="url(#a)"/><path d="M228 316 C262 316 262 252 290 248"/>
+  </g>
+
+  <!-- step 1 -->
+  <rect x="294" y="184" width="210" height="124" rx="12" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text x="399" y="212" font-size="14" font-weight="700" fill="#92400e" text-anchor="middle">① PHÂN BỔ VOUCHER</text>
+  <text x="399" y="236" font-size="12" fill="#334155" text-anchor="middle">tỷ trọng giá trị từng dòng</text>
+  <text x="399" y="254" font-size="12" fill="#334155" text-anchor="middle">quà tặng nhận 0</text>
+  <text x="399" y="282" font-size="12" font-weight="700" fill="#78350f" text-anchor="middle">→ doanh thu thuần / dòng</text>
+  <path d="M504 246 L548 246" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+  <text x="399" y="336" font-size="12" fill="#64748b" text-anchor="middle">lọc đơn COMPLETED</text>
+  <text x="399" y="352" font-size="12" fill="#64748b" text-anchor="middle">tách theo (khách, shop)</text>
+
+  <!-- branches -->
+  <g stroke="#94a3b8" stroke-width="2" fill="none">
+    <path d="M552 246 C580 246 580 142 610 142" marker-end="url(#a)"/>
+    <path d="M552 246 C580 246 580 236 610 236" marker-end="url(#a)"/>
+    <path d="M552 246 C580 246 580 330 610 330" marker-end="url(#a)"/>
+    <path d="M552 246 C580 246 580 424 610 424" marker-end="url(#a)"/>
+  </g>
+  <path d="M228 444 C440 444 520 356 610 354" stroke="#db2777" stroke-width="2" fill="none" stroke-dasharray="5 4" marker-end="url(#a)"/>
+
+  <rect x="614" y="104" width="316" height="76" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="630" y="130" font-size="14" font-weight="700" fill="#1e3a8a">② VÒNG ĐỜI KHÁCH</text>
+  <text x="630" y="150" font-size="12" fill="#334155">new · active (&lt; 90 ngày) · return (≥ 90 ngày)</text>
+  <text x="630" y="168" font-size="12" fill="#334155">ngày → tháng → quý → năm</text>
+
+  <rect x="614" y="198" width="316" height="76" rx="12" fill="#e0e7ff" stroke="#4f46e5" stroke-width="2"/>
+  <text x="630" y="224" font-size="14" font-weight="700" fill="#3730a3">③ RFM &amp; PHÂN NHÓM</text>
+  <text x="630" y="244" font-size="12" fill="#334155">xếp hạng phần trăm trong từng shop</text>
+  <text x="630" y="262" font-size="12" fill="#334155">điểm 1–4 → 9 nhóm khách</text>
+
+  <rect x="614" y="292" width="316" height="76" rx="12" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+  <text x="630" y="318" font-size="14" font-weight="700" fill="#065f46">④ SẢN PHẨM TRONG ĐƠN</text>
+  <text x="630" y="338" font-size="12" fill="#334155">ngành hàng mua lần đầu hay mua lại</text>
+  <text x="630" y="356" font-size="12" fill="#334155">cross-selling · multi brand</text>
+
+  <rect x="614" y="386" width="316" height="76" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+  <text x="630" y="412" font-size="14" font-weight="700" fill="#5b21b6">⑤ ĐA KÊNH</text>
+  <text x="630" y="432" font-size="12" fill="#334155">khách mua ở một hay nhiều shop</text>
+  <text x="630" y="450" font-size="12" fill="#334155">single / multi channel</text>
+
+  <g stroke="#94a3b8" stroke-width="2" fill="none">
+    <path d="M930 142 C960 142 960 276 990 280"/><path d="M930 236 C960 236 960 280 990 284"/>
+    <path d="M930 330 C960 330 960 288 990 288"/><path d="M930 424 C960 424 960 292 986 292" marker-end="url(#a)"/>
+  </g>
+
+  <rect x="990" y="210" width="186" height="156" rx="12" fill="#0f172a"/>
+  <text x="1083" y="242" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">KẾT QUẢ</text>
+  <text x="1083" y="266" font-size="12" fill="#cbd5e1" text-anchor="middle">1 dòng = 1 sản phẩm</text>
+  <text x="1083" y="284" font-size="12" fill="#cbd5e1" text-anchor="middle">trong đơn, kèm nhãn</text>
+  <text x="1083" y="302" font-size="12" fill="#cbd5e1" text-anchor="middle">hành vi khách</text>
+  <text x="1083" y="336" font-size="12" font-weight="700" fill="#fbbf24" text-anchor="middle">→ nguồn cho Power BI</text>
+
+  <rect x="294" y="496" width="882" height="40" rx="10" fill="#f1f5f9"/>
+  <text x="735" y="521" font-size="13" fill="#334155" text-anchor="middle">Đơn chưa hoàn thành vẫn giữ trong kết quả để đối soát, nhưng không được gắn nhãn hành vi</text>
+</svg>
