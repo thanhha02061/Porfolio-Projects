@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  HUB_DIR: "0. [Python] Retail Data Hub"
+  HUB_DIR: "0.1. [Python] Retail Data Hub"
 
 jobs:
   pipeline:

@@ -115,7 +115,7 @@ combo livestream chưa có trong master data. Các phép kiểm tra bắt đư�
 ## 7. Cấu trúc thư mục
 
 ```
-0. [Python] Retail Data Hub/
+0.1. [Python] Retail Data Hub/
 ├── pipeline/
 │   ├── sources.py      giả lập các hệ thống nguồn (5 định dạng, kết quả cố định)
 │   └── run.py          extract → transform → kiểm tra chất lượng → publish
